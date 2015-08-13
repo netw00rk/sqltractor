@@ -19,26 +19,25 @@ type Driver struct {
 	db *sql.DB
 }
 
-const tableName = "schema_migrations"
+var tableName string = "schema_migrations"
 
 func (driver *Driver) Initialize(rawurl string) error {
+	var schema string
+	rawurl, schema = extractCurrentSchema(rawurl)
 
 	db, err := sql.Open("postgres", rawurl)
 	if err != nil {
 		return err
 	}
+
 	if err := db.Ping(); err != nil {
 		return err
 	}
 
-	if u, err := url.Parse(rawurl); err == nil {
-		q := u.Query()
-		if schema := q.Get("currentSchema"); schema != "" {
-			db.Exec("SET search_path TO $1", schema)
-		}
-	}
-
 	driver.db = db
+	if err := driver.ensureSchemaExists(schema, extractUser(rawurl)); err != nil {
+		return err
+	}
 
 	if err := driver.ensureVersionTableExists(); err != nil {
 		return err
@@ -49,6 +48,18 @@ func (driver *Driver) Initialize(rawurl string) error {
 func (driver *Driver) Close() error {
 	if err := driver.db.Close(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (driver *Driver) ensureSchemaExists(schema, user string) error {
+	if schema != "" {
+		if _, err := driver.db.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s", schema, user)); err != nil {
+			return err
+		}
+
+		tableName = fmt.Sprintf("%s.%s", schema, tableName)
+		driver.db.Exec(fmt.Sprintf("SET search_path TO %s, public", schema))
 	}
 	return nil
 }
@@ -131,6 +142,20 @@ func (driver *Driver) Version() (uint64, error) {
 	default:
 		return version, nil
 	}
+}
+
+func extractCurrentSchema(rawurl string) (string, string) {
+	u, _ := url.Parse(rawurl);
+	q := u.Query()
+	schema := q.Get("currentSchema")
+	q.Del("currentSchema")
+	u.RawQuery = q.Encode()
+	return u.String(), schema
+}
+
+func extractUser(rawurl string) string {
+	u, _ := url.Parse(rawurl);
+	return u.User.Username()
 }
 
 func init() {
