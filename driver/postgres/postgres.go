@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/lib/pq"
 
@@ -19,12 +20,10 @@ type Driver struct {
 	db *sql.DB
 }
 
-var tableName string = "schema_migrations"
+const TABLE_NAME string = "schema_migrations"
+var tableName string
 
 func (driver *Driver) Initialize(rawurl string) error {
-	var schema string
-	rawurl, schema = extractCurrentSchema(rawurl)
-
 	db, err := sql.Open("postgres", rawurl)
 	if err != nil {
 		return err
@@ -35,7 +34,7 @@ func (driver *Driver) Initialize(rawurl string) error {
 	}
 
 	driver.db = db
-	if err := driver.ensureSchemaExists(schema, extractUser(rawurl)); err != nil {
+	if err := driver.ensureSchemaExists(extractCurrentSchema(rawurl), extractUser(rawurl)); err != nil {
 		return err
 	}
 
@@ -54,12 +53,10 @@ func (driver *Driver) Close() error {
 
 func (driver *Driver) ensureSchemaExists(schema, user string) error {
 	if schema != "" {
-		if _, err := driver.db.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s AUTHORIZATION %s", schema, user)); err != nil {
+		if _, err := driver.db.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schema)); err != nil {
 			return err
 		}
-
-		tableName = fmt.Sprintf("%s.%s", schema, tableName)
-		driver.db.Exec(fmt.Sprintf("SET search_path TO %s, public", schema))
+		tableName = fmt.Sprintf("%s.%s", schema, TABLE_NAME)
 	}
 	return nil
 }
@@ -109,6 +106,7 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 	}
 
 	if _, err := tx.Exec(string(f.Content)); err != nil {
+		fmt.Println(err)
 		pqErr := err.(*pq.Error)
 		offset, err := strconv.Atoi(pqErr.Position)
 		if err == nil && offset >= 0 {
@@ -144,13 +142,14 @@ func (driver *Driver) Version() (uint64, error) {
 	}
 }
 
-func extractCurrentSchema(rawurl string) (string, string) {
+func extractCurrentSchema(rawurl string) string {
 	u, _ := url.Parse(rawurl);
-	q := u.Query()
-	schema := q.Get("currentSchema")
-	q.Del("currentSchema")
-	u.RawQuery = q.Encode()
-	return u.String(), schema
+	search_path := u.Query().Get("search_path")
+	parts := strings.Split(search_path, ",")
+	if len(parts) > 0 {
+		return strings.Trim(parts[0], " ")
+	}
+	return ""
 }
 
 func extractUser(rawurl string) string {
