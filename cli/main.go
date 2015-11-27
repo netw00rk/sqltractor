@@ -1,6 +1,4 @@
 // Package main is the CLI.
-// You can use the CLI via Terminal.
-// import "github.com/netw00rk/sqltractor/migrate" for usage within Go.
 package main
 
 import (
@@ -12,12 +10,10 @@ import (
 
 	"github.com/fatih/color"
 
-	"github.com/netw00rk/sqltractor/migrate"
-	"github.com/netw00rk/sqltractor/migrate/direction"
-	"github.com/netw00rk/sqltractor/migrate/file"
-	"github.com/netw00rk/sqltractor/migrate/pipe"
+	"github.com/netw00rk/sqltractor/tractor"
+	"github.com/netw00rk/sqltractor/tractor/direction"
+	"github.com/netw00rk/sqltractor/tractor/file"
 
-	_ "github.com/netw00rk/sqltractor/driver/bash"
 	_ "github.com/netw00rk/sqltractor/driver/cassandra"
 	_ "github.com/netw00rk/sqltractor/driver/mysql"
 	_ "github.com/netw00rk/sqltractor/driver/postgres"
@@ -25,121 +21,97 @@ import (
 )
 
 var url = flag.String("url", os.Getenv("MIGRATE_URL"), "")
-var migrationsPath = flag.String("path", "", "")
-var version = flag.Bool("version", false, "Show sqltractor version")
+var path = flag.String("path", "", "")
 
 func main() {
 	flag.Parse()
 	command := flag.Arg(0)
 	if command == "" || command == "help" {
-		helpCmd()
+		printHelpCmd()
 		os.Exit(0)
 	}
 
-	if *migrationsPath == "" {
+	if *path == "" {
 		var err error
-		if *migrationsPath, err = os.Getwd(); err != nil {
+		if *path, err = os.Getwd(); err != nil {
 			fmt.Println("Please specify path")
 			os.Exit(1)
 		}
 	}
-	pipe := pipe.New()
+
+	tractor, err := tractor.NewTractor(*url, *path)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	switch command {
-	case "create":
-		name := flag.Arg(1)
-		if name == "" {
-			fmt.Println("Please specify name.")
-			os.Exit(1)
-		}
-
-		migrationFile, err := migrate.Create(*url, *migrationsPath, name)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Version %v migration files created in %v:\n", migrationFile.Version, *migrationsPath)
-		fmt.Println(migrationFile.UpFile.FileName)
-		fmt.Println(migrationFile.DownFile.FileName)
-
 	case "migrate":
-		relativeN := flag.Arg(1)
-		relativeNInt, err := strconv.Atoi(relativeN)
+		relativeN, err := strconv.Atoi(flag.Arg(1))
 		if err != nil {
 			fmt.Println("Unable to parse param <n>.")
 			os.Exit(1)
 		}
-		timerStart = time.Now()
-		go migrate.Migrate(pipe, *url, *migrationsPath, relativeNInt)
-		ok := writePipe(pipe)
-		printTimer()
-		if !ok {
-			os.Exit(1)
+
+		timerStart := time.Now()
+		for r := range tractor.MigrateAsync(relativeN) {
+			if r.Error != nil {
+				printFile(r.File, err)
+				os.Exit(1)
+			}
+			printFile(r.File, nil)
 		}
+		printTimer(timerStart)
 
 	case "goto":
-		toVersion := flag.Arg(1)
-		toVersionInt, err := strconv.Atoi(toVersion)
-		if err != nil || toVersionInt < 0 {
+		toVersion, err := strconv.Atoi(flag.Arg(1))
+		if err != nil || toVersion < 0 {
 			fmt.Println("Unable to parse param <v>.")
 			os.Exit(1)
 		}
 
-		currentVersion, err := migrate.Version(*url, *migrationsPath)
+		currentVersion, err := tractor.Version()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 
-		relativeNInt := toVersionInt - int(currentVersion)
+		relativeN := toVersion - int(currentVersion)
 
-		timerStart = time.Now()
-		go migrate.Migrate(pipe, *url, *migrationsPath, relativeNInt)
-		ok := writePipe(pipe)
-		printTimer()
-		if !ok {
-			os.Exit(1)
+		timerStart := time.Now()
+		for r := range tractor.MigrateAsync(relativeN) {
+			if r.Error != nil {
+				printFile(r.File, err)
+				os.Exit(1)
+			}
+			printFile(r.File, nil)
 		}
+		printTimer(timerStart)
 
 	case "up":
-		timerStart = time.Now()
-		go migrate.Up(pipe, *url, *migrationsPath)
-		ok := writePipe(pipe)
-		printTimer()
-		if !ok {
-			os.Exit(1)
+		timerStart := time.Now()
+		for r := range tractor.UpAsync() {
+			if r.Error != nil {
+				printFile(r.File, err)
+				os.Exit(1)
+			}
+			printFile(r.File, nil)
 		}
+		printTimer(timerStart)
 
 	case "down":
-		timerStart = time.Now()
-		go migrate.Down(pipe, *url, *migrationsPath)
-		ok := writePipe(pipe)
-		printTimer()
-		if !ok {
-			os.Exit(1)
+		timerStart := time.Now()
+		for r := range tractor.DownAsync() {
+			if r.Error != nil {
+				printFile(r.File, err)
+				os.Exit(1)
+			}
+			printFile(r.File, nil)
 		}
-
-	case "redo":
-		timerStart = time.Now()
-		go migrate.Redo(pipe, *url, *migrationsPath)
-		ok := writePipe(pipe)
-		printTimer()
-		if !ok {
-			os.Exit(1)
-		}
-
-	case "reset":
-		timerStart = time.Now()
-		go migrate.Reset(pipe, *url, *migrationsPath)
-		ok := writePipe(pipe)
-		printTimer()
-		if !ok {
-			os.Exit(1)
-		}
+		printTimer(timerStart)
 
 	case "version":
-		version, err := migrate.Version(*url, *migrationsPath)
+		version, err := tractor.Version()
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -148,57 +120,24 @@ func main() {
 	}
 }
 
-func writePipe(pipe chan interface{}) (ok bool) {
-	okFlag := true
-	if pipe != nil {
-		for {
-			select {
-			case item, more := <-pipe:
-				if !more {
-					return okFlag
-				} else {
-					switch item.(type) {
-
-					case string:
-						fmt.Println(item.(string))
-
-					case error:
-						c := color.New(color.FgRed)
-						c.Println(item.(error).Error(), "\n")
-						okFlag = false
-
-					case file.File:
-						f := item.(file.File)
-						c := color.New(color.FgBlue)
-						if f.Direction == direction.Up {
-							c.Print(">")
-						} else if f.Direction == direction.Down {
-							c.Print("<")
-						}
-						fmt.Printf(" %s\n", f.FileName)
-
-					default:
-						text := fmt.Sprint(item)
-						fmt.Println(text)
-					}
-				}
-			}
-		}
+func printFile(f *file.File, err error) {
+	if err != nil {
+		c := color.New(color.FgRed)
+		c.Println(err.Error(), "\n")
+		return
 	}
-	return okFlag
+
+	c := color.New(color.FgBlue)
+	if f.Direction == direction.Up {
+		c.Print(">")
+	} else if f.Direction == direction.Down {
+		c.Print("<")
+	}
+	fmt.Printf(" %s\n", f.FileName)
 }
 
-func verifyMigrationsPath(path string) {
-	if path == "" {
-		fmt.Println("Please specify path")
-		os.Exit(1)
-	}
-}
-
-var timerStart time.Time
-
-func printTimer() {
-	diff := time.Now().Sub(timerStart).Seconds()
+func printTimer(start time.Time) {
+	diff := time.Now().Sub(start).Seconds()
 	if diff > 60 {
 		fmt.Printf("\n%.4f minutes\n", diff/60)
 	} else {
@@ -206,7 +145,7 @@ func printTimer() {
 	}
 }
 
-func helpCmd() {
+func printHelpCmd() {
 	os.Stderr.WriteString(
 		`usage: sqltractor [-path=<path>] -url=<url> <command> [<args>]
 

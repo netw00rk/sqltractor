@@ -10,8 +10,8 @@ import (
 	"github.com/gocql/gocql"
 
 	"github.com/netw00rk/sqltractor/driver/registry"
-	"github.com/netw00rk/sqltractor/migrate/direction"
-	"github.com/netw00rk/sqltractor/migrate/file"
+	"github.com/netw00rk/sqltractor/tractor/direction"
+	"github.com/netw00rk/sqltractor/tractor/file"
 )
 
 type Driver struct {
@@ -19,25 +19,8 @@ type Driver struct {
 }
 
 const (
-	tableName  = "schema_migrations"
-	versionRow = 1
-)
-
-type counterStmt bool
-
-func (c counterStmt) String() string {
-	sign := ""
-	if bool(c) {
-		sign = "+"
-	} else {
-		sign = "-"
-	}
-	return "UPDATE " + tableName + " SET version = version " + sign + " 1 where versionRow = ?"
-}
-
-const (
-	up   counterStmt = true
-	down counterStmt = false
+	TABLE_NAME  = "schema_migrations"
+	VERSION_ROW = 1
 )
 
 // Cassandra Driver URL format:
@@ -85,58 +68,13 @@ func (driver *Driver) Close() error {
 	return nil
 }
 
-func (driver *Driver) ensureVersionTableExists() error {
-	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + tableName + " (version counter, versionRow bigint primary key);").Exec()
-	if err != nil {
-		return err
-	}
-
-	_, err = driver.Version()
-	if err != nil {
-		driver.session.Query(up.String(), versionRow).Exec()
-	}
-
-	return nil
-}
-
 func (driver *Driver) FilenameExtension() string {
 	return "cql"
 }
 
-func (driver *Driver) version(d direction.Direction, invert bool) error {
-	var stmt counterStmt
-	switch d {
-	case direction.Up:
-		stmt = up
-	case direction.Down:
-		stmt = down
-	}
-	if invert {
-		stmt = !stmt
-	}
-	return driver.session.Query(stmt.String(), versionRow).Exec()
-}
-
-func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
-	var err error
-	defer func() {
-		if err != nil {
-			// Invert version direction if we couldn't apply the changes for some reason.
-			if err := driver.version(f.Direction, true); err != nil {
-				pipe <- err
-			}
-			pipe <- err
-		}
-		close(pipe)
-	}()
-
-	pipe <- f
-	if err = driver.version(f.Direction, false); err != nil {
-		return
-	}
-
-	if err = f.ReadContent(); err != nil {
-		return
+func (driver *Driver) Migrate(f *file.File) error {
+	if err := f.ReadContent(); err != nil {
+		return err
 	}
 
 	for _, query := range strings.Split(string(f.Content), ";") {
@@ -145,18 +83,49 @@ func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
 			continue
 		}
 
-		if err = driver.session.Query(query).Exec(); err != nil {
-			return
+		if err := driver.session.Query(query).Exec(); err != nil {
+			return err
 		}
 	}
+
+	if err := driver.version(f.Direction); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (driver *Driver) Version() (uint64, error) {
 	var version int64
-	err := driver.session.Query("SELECT version FROM "+tableName+" WHERE versionRow = ?", versionRow).Scan(&version)
+	err := driver.session.Query("SELECT version FROM " + TABLE_NAME + " WHERE versionRow = ?", VERSION_ROW).Scan(&version)
 	return uint64(version) - 1, err
 }
 
+func (driver *Driver) ensureVersionTableExists() error {
+	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (version counter, versionRow bigint primary key);").Exec()
+	if err != nil {
+		return err
+	}
+
+	_, err = driver.Version()
+	if err != nil {
+		driver.session.Query(UP.String(), VERSION_ROW).Exec()
+	}
+
+	return nil
+}
+
+func (driver *Driver) version(d direction.Direction) error {
+	var stmt counterStmt
+	switch d {
+	case direction.Up:
+		stmt = UP
+	case direction.Down:
+		stmt = DOWN
+	}
+	return driver.session.Query(stmt.String(), VERSION_ROW).Exec()
+}
+
 func init() {
-	registry.RegisterDriver("cassandra", Driver{})
+	registry.RegisterDriver("cassandra", new(Driver))
 }

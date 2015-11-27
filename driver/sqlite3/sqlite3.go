@@ -10,8 +10,8 @@ import (
 	"github.com/mattn/go-sqlite3"
 
 	"github.com/netw00rk/sqltractor/driver/registry"
-	"github.com/netw00rk/sqltractor/migrate/direction"
-	"github.com/netw00rk/sqltractor/migrate/file"
+	"github.com/netw00rk/sqltractor/tractor/direction"
+	"github.com/netw00rk/sqltractor/tractor/file"
 )
 
 type Driver struct {
@@ -48,70 +48,54 @@ func (driver *Driver) Close() error {
 	return nil
 }
 
-func (driver *Driver) ensureVersionTableExists() error {
-	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version INTEGER PRIMARY KEY AUTOINCREMENT);"); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (driver *Driver) FilenameExtension() string {
 	return "sql"
 }
 
-func (driver *Driver) Migrate(f file.File, pipe chan interface{}) {
-	defer close(pipe)
-	pipe <- f
-
+func (driver *Driver) Migrate(f *file.File) error {
 	tx, err := driver.db.Begin()
 	if err != nil {
-		pipe <- err
-		return
+		return err
 	}
 
 	if f.Direction == direction.Up {
 		if _, err := tx.Exec("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version); err != nil {
-			pipe <- err
 			if err := tx.Rollback(); err != nil {
-				pipe <- err
+				return err
 			}
-			return
+			return err
 		}
 	} else if f.Direction == direction.Down {
 		if _, err := tx.Exec("DELETE FROM "+tableName+" WHERE version=?", f.Version); err != nil {
-			pipe <- err
 			if err := tx.Rollback(); err != nil {
-				pipe <- err
+				return err
 			}
-			return
+			return err
 		}
 	}
 
 	if err := f.ReadContent(); err != nil {
-		pipe <- err
-		return
+		return err
 	}
 
 	if _, err := tx.Exec(string(f.Content)); err != nil {
-		sqliteErr, isErr := err.(sqlite3.Error)
-
-		if isErr {
+		if sqliteErr, isErr := err.(sqlite3.Error); isErr {
 			// The sqlite3 library only provides error codes, not position information. Output what we do know
-			pipe <- errors.New(fmt.Sprintf("SQLite Error (%s); Extended (%s)\nError: %s", sqliteErr.Code.Error(), sqliteErr.ExtendedCode.Error(), sqliteErr.Error()))
+			return errors.New(fmt.Sprintf("SQLite Error (%s); Extended (%s)\nError: %s", sqliteErr.Code.Error(), sqliteErr.ExtendedCode.Error(), sqliteErr.Error()))
 		} else {
-			pipe <- errors.New(fmt.Sprintf("An error occurred: %s", err.Error()))
+			return errors.New(fmt.Sprintf("An error occurred: %s", err.Error()))
 		}
 
 		if err := tx.Rollback(); err != nil {
-			pipe <- err
+			return err
 		}
-		return
 	}
 
 	if err := tx.Commit(); err != nil {
-		pipe <- err
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (driver *Driver) Version() (uint64, error) {
@@ -127,6 +111,13 @@ func (driver *Driver) Version() (uint64, error) {
 	}
 }
 
+func (driver *Driver) ensureVersionTableExists() error {
+	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version INTEGER PRIMARY KEY AUTOINCREMENT);"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func init() {
-	registry.RegisterDriver("sqlite3", Driver{})
+	registry.RegisterDriver("sqlite3", new(Driver))
 }

@@ -6,7 +6,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/netw00rk/sqltractor/migrate/direction"
+	"github.com/netw00rk/sqltractor/tractor/direction"
 )
 
 func TestParseFilenameSchema(t *testing.T) {
