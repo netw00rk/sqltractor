@@ -19,7 +19,7 @@ func RegisterDriver(name string, driver driver.Driver) {
 
 // Retrieves a registered driver by name
 func GetDriver(name string) (driver.Driver, error) {
-	if d, ok := driverRegistry[name]; !ok {
+	if d, ok := driverRegistry[name]; ok {
 		return d, nil
 	}
 
