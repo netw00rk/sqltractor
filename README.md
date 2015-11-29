@@ -2,7 +2,18 @@
 
 SQL schema migration tool for GO. Use it in your existing Golang code or run commands via the CLI.
 
-## Usage from Terminal
+## Available Drivers
+
+ * [PostgreSQL](https://github.com/netw00rk/sqltractor/tree/master/driver/postgres)
+ * [Cassandra](https://github.com/netw00rk/sqltractor/tree/master/driver/cassandra)
+ * [SQLite](https://github.com/netw00rk/sqltractor/tree/master/driver/sqlite3)
+ * [MySQL](https://github.com/netw00rk/sqltractor/tree/master/driver/mysql) (experimental)
+
+Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/netw00rk/sqltractor/driver#Driver) and open a PR.
+
+## Usage
+
+**from Terminal**
 
 ```bash
 # install
@@ -37,9 +48,9 @@ sqltractor-cli -url driver://url -path ./migrations goto v
 ```
 
 
-## Usage in Go
+**in Go code**
 
-See GoDoc here: http://godoc.org/github.com/mattes/migrate/migrate
+See GoDoc here: http://godoc.org/github.com/netw00rk/sqltractor/tractor
 
 ```go
 import "github.com/netw00rk/sqltractor/tractor"
@@ -62,9 +73,9 @@ if err != nil {
 
 // UpAsync returning chan of Result struct
 // type Resutl {
-    File  // applied file
-    Error // error if something happened
-}
+//    File  // applied file
+//    Error // error if something happened
+//}
 for r := range tractor.UpAsync() {
     if r.Error != nil {
         // do something with error
