@@ -1,6 +1,6 @@
 # sqltractor
 
-SQL schema migration tool for GO. Use it in your existing Golang code or run commands via the CLI.
+SQL schema migration tool for Go. Use it in your existing Go code or run commands via the CLI.
 
 ## Available Drivers
 
@@ -47,7 +47,6 @@ sqltractor-cli -url driver://url -path ./migrations goto 10
 sqltractor-cli -url driver://url -path ./migrations goto v
 ```
 
-
 **in Go code**
 
 See GoDoc here: http://godoc.org/github.com/netw00rk/sqltractor/tractor
@@ -58,21 +57,21 @@ import "github.com/netw00rk/sqltractor/tractor"
 // Import any required drivers so that they are registered and available
 import _ "github.com/netw00rk/sqltractor/driver/postgres"
 
-// use synchronous versions of migration functions ...
-// files - slice of applied migration files 
+// use synchronous versions of migration functions that
+// return slice of applied migration files and error
 files, err := tractor.Up("driver://url", "./path")
 if err != nil {
   // do something with error
 }
 
-// to use the asynchronous version you have to instantiate Tractor struct
+// to use the asynchronous version you have to instantiate Tractor structure
 tractor, err := tractor.NewTractor("driver://url", "./path")
 if err != nil {
   // do something with error
 }
 
-// UpAsync returning chan of Result struct
-// type Resutl {
+// UpAsync returning chan of Result structure
+// type Result struct {
 //    File  // applied file
 //    Error // error if something happened
 //}
@@ -83,3 +82,20 @@ for r := range tractor.UpAsync() {
     // do something with applied file
 }
 ```
+
+## Migration files
+
+The format of migration files looks like this:
+
+```
+001_initial_plan_to_do_sth.up.sql     # up migration instructions
+001_initial_plan_to_do_sth.down.sql   # down migration instructions
+002_xxx.up.sql
+002_xxx.down.sql
+...
+```
+
+Why two files? This way you could still do sth like 
+``psql -f ./db/migrations/001_initial_plan_to_do_sth.up.sql`` and there is no
+need for any custom markup language to divide up and down migrations. Please note
+that the filename extension depends on the driver.

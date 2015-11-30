@@ -6,7 +6,7 @@ import (
 	"github.com/netw00rk/sqltractor/tractor/file"
 )
 
-// Struct for holding migration resutl
+// Structure for holding migration result
 type Result struct {
 	// Executed file
 	File *file.File
@@ -15,16 +15,13 @@ type Result struct {
 	Error error
 }
 
-// Tractor is main struct to work with migration
-// To instantiate use NewTractor func
+// Tractor is main structure to work with migration.
 type Tractor struct {
 	driver driver.Driver
 	manager file.MigrationManager
 }
 
-// Returns new pointer of Tractor struct or error if
-// url format is driver://user:password@host/database
-// path is filesystem path with migration files
+// Returns new pointer of Tractor struct or error
 func NewTractor(url, path string) (*Tractor, error) {
 	var err error
 
@@ -42,7 +39,7 @@ func NewTractor(url, path string) (*Tractor, error) {
 	return t, nil
 }
 
-// Up applies all available migrations
+// Applies all available migrations asynchronously
 func (t *Tractor) UpAsync() chan Result {
 	version, err := t.driver.Version()
 	if err != nil {
@@ -52,7 +49,7 @@ func (t *Tractor) UpAsync() chan Result {
 	return t.applyAsync(t.manager.ToLastFrom(version))
 }
 
-// Down rolls back all migrations
+// Rolls back all migrations asynchronously
 func (t *Tractor) DownAsync() chan Result {
 	version, err := t.driver.Version()
 	if err != nil {
@@ -62,7 +59,7 @@ func (t *Tractor) DownAsync() chan Result {
 	return t.applyAsync(t.manager.ToFirstFrom(version))
 }
 
-// Migrate applies relative +n/-n migrations
+// Applies relative +n/-n migrations asynchronously
 func (t *Tractor) MigrateAsync(relativeN int) chan Result {
 	version, err := t.driver.Version()
 	if err != nil {
@@ -72,7 +69,7 @@ func (t *Tractor) MigrateAsync(relativeN int) chan Result {
 	return t.applyAsync(t.manager.From(version, relativeN))
 }
 
-// Version returns the current migration version
+// Returns the current migration version
 func (t *Tractor) Version() (uint64, error) {
 	return t.driver.Version()
 }

@@ -153,8 +153,6 @@ Commands:
    create <name>  Create a new migration
    up             Apply all -up- migrations
    down           Apply all -down- migrations
-   reset          Down followed by Up
-   redo           Roll back most recent migration, then apply it again
    version        Show current migration version
    migrate <n>    Apply migrations -n|+n
    goto <v>       Migrate to version v

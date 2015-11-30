@@ -4,10 +4,10 @@ import (
 	"sort"
 	"errors"
 	"regexp"
+	"fmt"
 
 	"github.com/netw00rk/sqltractor/tractor/direction"
 	"github.com/netw00rk/sqltractor/tractor/file/reader"
-	"fmt"
 )
 
 var (
