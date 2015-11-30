@@ -1,8 +1,10 @@
 package tractor
 
 import (
-	utils "github.com/netw00rk/sqltractor/driver"
-	"github.com/netw00rk/sqltractor/driver/driver"
+	neturl "net/url"
+
+	"github.com/netw00rk/sqltractor/driver"
+	"github.com/netw00rk/sqltractor/driver/registry"
 	"github.com/netw00rk/sqltractor/tractor/file"
 )
 
@@ -26,7 +28,7 @@ func NewTractor(url, path string) (*Tractor, error) {
 	var err error
 
 	t := new(Tractor)
-	t.driver, err = utils.New(url)
+	t.driver, err = initDriver(url)
 	if err != nil {
 		return nil, err
 	}
@@ -91,4 +93,22 @@ func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
 		}
 	}
 	close(resultChan)
+}
+
+func initDriver(url string)  (driver.Driver, error) {
+	u, err := neturl.Parse(url)
+	if err != nil {
+		return nil, err
+	}
+
+	d, err := registry.GetDriver(u.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := d.Initialize(url); err != nil {
+		return nil, err
+	}
+
+	return d, nil
 }

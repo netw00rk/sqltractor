@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/netw00rk/sqltractor/driver/driver"
+	"github.com/netw00rk/sqltractor/driver"
 )
 
 var driverRegistry map[string]driver.Driver

@@ -1,28 +1,29 @@
 // Package driver holds the driver interface.
 package driver
 
-import (
-	neturl "net/url" // alias to allow `url string` func signature in New
+import	"github.com/netw00rk/sqltractor/tractor/file"
 
-	"github.com/netw00rk/sqltractor/driver/registry"
-	"github.com/netw00rk/sqltractor/driver/driver"
-)
+// Driver is the interface type that needs to implemented by all drivers.
+type Driver interface {
 
-// New returns Driver and calls Initialize on it
-func New(url string) (driver.Driver, error) {
-	u, err := neturl.Parse(url)
-	if err != nil {
-		return nil, err
-	}
+	// Initialize is the first function to be called.
+	// Check the url string and open and verify any connection
+	// that has to be made.
+	Initialize(url string) error
 
-	d, err := registry.GetDriver(u.Scheme)
-	if err != nil {
-		return nil, err
-	}
+	// Close is the last function to be called.
+	// Close any open connection here.
+	Close() error
 
-	if err := d.Initialize(url); err != nil {
-		return nil, err
-	}
+	// FilenameExtension returns the extension of the migration files.
+	// The returned string must not begin with a dot.
+	FilenameExtension() string
 
-	return d, nil
+	// Migrate is the heart of the driver.
+	// It will receive a file which the driver should apply
+	// to its backend or whatever.
+	Migrate(file *file.File) error
+
+	// Version returns the current migration version.
+	Version() (uint64, error)
 }
