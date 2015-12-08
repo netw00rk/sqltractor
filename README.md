@@ -99,3 +99,8 @@ Why two files? This way you could still do sth like
 ``psql -f ./db/migrations/001_initial_plan_to_do_sth.up.sql`` and there is no
 need for any custom markup language to divide up and down migrations. Please note
 that the filename extension depends on the driver.
+
+
+## Acknowledgements
+
+Many thanks goes to Matthias Kadenbach, https://github.com/mattes and all contributors to the https://github.com/mattes/migrate for the ideas and code
