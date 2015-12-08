@@ -20,6 +20,7 @@ type Driver struct {
 
 const (
 	TABLE_NAME  = "schema_migrations"
+	LOCK_TABLE  = "schema_migrations_lock"
 	VERSION_ROW = 1
 )
 
@@ -39,7 +40,6 @@ func (driver *Driver) Initialize(rawurl string) error {
 	// Check if url user struct is null
 	if u.User != nil {
 		password, passwordSet := u.User.Password()
-
 		if passwordSet == false {
 			return fmt.Errorf("Missing password. Please provide password.")
 		}
@@ -72,6 +72,22 @@ func (driver *Driver) FilenameExtension() string {
 	return "cql"
 }
 
+func (driver *Driver) Lock() error {
+	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN)", LOCK_TABLE)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (driver *Driver) Release() error {
+	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (driver *Driver) Migrate(f *file.File) error {
 	if err := f.ReadContent(); err != nil {
 		return err
@@ -97,12 +113,12 @@ func (driver *Driver) Migrate(f *file.File) error {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version int64
-	err := driver.session.Query("SELECT version FROM " + TABLE_NAME + " WHERE versionRow = ?", VERSION_ROW).Scan(&version)
+	err := driver.session.Query(fmt.Sprintf("SELECT version FROM %s WHERE versionRow = ?", TABLE_NAEM), VERSION_ROW).Scan(&version)
 	return uint64(version) - 1, err
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	err := driver.session.Query("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (version counter, versionRow bigint primary key);").Exec()
+	err := driver.session.Query(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version COUNTER, versionRow BIGINT PRIMARY KEY)", TABLE_NAME)).Exec()
 	if err != nil {
 		return err
 	}

@@ -18,7 +18,10 @@ type Driver struct {
 	db *sql.DB
 }
 
-const tableName = "schema_migration"
+const (
+	TABLE_NAME      = "schema_migration"
+	LOCK_TABLE_NAME = "schema_migration_lock"
+)
 
 func (driver *Driver) Initialize(url string) error {
 	filename := strings.SplitN(url, "sqlite3://", 2)
@@ -52,6 +55,22 @@ func (driver *Driver) FilenameExtension() string {
 	return "sql"
 }
 
+func (driver *Driver) Lock() error {
+	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (lock INTEGER NOT NULL);", LOCK_TABLE_NAME)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (driver *Driver) Release() error {
+	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE_NAME)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (driver *Driver) Migrate(f *file.File) error {
 	tx, err := driver.db.Begin()
 	if err != nil {
@@ -59,14 +78,14 @@ func (driver *Driver) Migrate(f *file.File) error {
 	}
 
 	if f.Direction == direction.Up {
-		if _, err := tx.Exec("INSERT INTO "+tableName+" (version) VALUES (?)", f.Version); err != nil {
+		if _, err := tx.Exec(fmt.Sprintf("INSERT INTO %s (version) VALUES (?)", TABLE_NAME), f.Version); err != nil {
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
 			return err
 		}
 	} else if f.Direction == direction.Down {
-		if _, err := tx.Exec("DELETE FROM "+tableName+" WHERE version=?", f.Version); err != nil {
+		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE version=?", TABLE_NAME), f.Version); err != nil {
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
@@ -100,7 +119,7 @@ func (driver *Driver) Migrate(f *file.File) error {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version uint64
-	err := driver.db.QueryRow("SELECT version FROM " + tableName + " ORDER BY version DESC LIMIT 1").Scan(&version)
+	err := driver.db.QueryRow(fmt.Sprintf("SELECT version FROM %s ORDER BY version DESC LIMIT 1", TABLE_NAME)).Scan(&version)
 	switch {
 	case err == sql.ErrNoRows:
 		return 0, nil
@@ -112,7 +131,7 @@ func (driver *Driver) Version() (uint64, error) {
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version INTEGER PRIMARY KEY AUTOINCREMENT);"); err != nil {
+	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (version INTEGER PRIMARY KEY AUTOINCREMENT);"); err != nil {
 		return err
 	}
 	return nil

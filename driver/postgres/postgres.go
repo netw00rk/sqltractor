@@ -20,8 +20,10 @@ type Driver struct {
 	db *sql.DB
 }
 
-const TABLE_NAME string = "schema_migrations"
-var tableName string
+const (
+	TABLE_NAME string = "schema_migrations"
+	LOCK_TABLE string = "schema_migrations_lock"
+)
 
 func (driver *Driver) Initialize(rawurl string) error {
 	db, err := sql.Open("postgres", rawurl)
@@ -55,6 +57,22 @@ func (driver *Driver) FilenameExtension() string {
 	return "sql"
 }
 
+func (driver *Driver) Lock() error {
+	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN)", LOCK_TABLE)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (driver *Driver) Release() error {
+	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (driver *Driver) Migrate(f *file.File) error {
 	tx, err := driver.db.Begin()
 	if err != nil {
@@ -62,14 +80,14 @@ func (driver *Driver) Migrate(f *file.File) error {
 	}
 
 	if f.Direction == direction.Up {
-		if _, err := tx.Exec("INSERT INTO "+tableName+" (version) VALUES ($1)", f.Version); err != nil {
+		if _, err := tx.Exec(fmt.Sprintf("INSERT INTO %s (version) VALUES ($1)", TABLE_NAME), f.Version); err != nil {
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
 			return err
 		}
 	} else if f.Direction == direction.Down {
-		if _, err := tx.Exec("DELETE FROM "+tableName+" WHERE version=$1", f.Version); err != nil {
+		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s WHERE version=$1", TABLE_NAME), f.Version); err != nil {
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
@@ -106,7 +124,7 @@ func (driver *Driver) Migrate(f *file.File) error {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version uint64
-	err := driver.db.QueryRow("SELECT version FROM " + tableName + " ORDER BY version DESC LIMIT 1").Scan(&version)
+	err := driver.db.QueryRow(fmt.Sprintf("SELECT version FROM %s ORDER BY version DESC LIMIT 1", TABLE_NAME)).Scan(&version)
 	switch {
 	case err == sql.ErrNoRows:
 		return 0, nil
@@ -122,20 +140,19 @@ func (driver *Driver) ensureSchemaExists(schema, user string) error {
 		if _, err := driver.db.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", schema)); err != nil {
 			return err
 		}
-		tableName = fmt.Sprintf("%s.%s", schema, TABLE_NAME)
 	}
 	return nil
 }
 
 func (driver *Driver) ensureVersionTableExists() error {
-	if _, err := driver.db.Exec("CREATE TABLE IF NOT EXISTS " + tableName + " (version int not null primary key);"); err != nil {
+	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version INTEGER NOT NULL PRIMARY KEY)", TABLE_NAME)); err != nil {
 		return err
 	}
 	return nil
 }
 
 func extractCurrentSchema(rawurl string) string {
-	u, _ := url.Parse(rawurl);
+	u, _ := url.Parse(rawurl)
 	search_path := u.Query().Get("search_path")
 	parts := strings.Split(search_path, ",")
 	if len(parts) > 0 {
@@ -145,7 +162,7 @@ func extractCurrentSchema(rawurl string) string {
 }
 
 func extractUser(rawurl string) string {
-	u, _ := url.Parse(rawurl);
+	u, _ := url.Parse(rawurl)
 	return u.User.Username()
 }
 

@@ -19,7 +19,7 @@ type Result struct {
 
 // Tractor is main structure to work with migration.
 type Tractor struct {
-	driver driver.Driver
+	driver  driver.Driver
 	manager file.MigrationManager
 }
 
@@ -45,7 +45,7 @@ func NewTractor(url, path string) (*Tractor, error) {
 func (t *Tractor) UpAsync() chan Result {
 	version, err := t.driver.Version()
 	if err != nil {
-		panic(err)
+		return t.wrapAsyncError(err)
 	}
 
 	return t.applyAsync(t.manager.ToLastFrom(version))
@@ -55,7 +55,7 @@ func (t *Tractor) UpAsync() chan Result {
 func (t *Tractor) DownAsync() chan Result {
 	version, err := t.driver.Version()
 	if err != nil {
-		panic(err)
+		return t.wrapAsyncError(err)
 	}
 
 	return t.applyAsync(t.manager.ToFirstFrom(version))
@@ -65,7 +65,7 @@ func (t *Tractor) DownAsync() chan Result {
 func (t *Tractor) MigrateAsync(relativeN int) chan Result {
 	version, err := t.driver.Version()
 	if err != nil {
-		panic(err)
+		return t.wrapAsyncError(err)
 	}
 
 	return t.applyAsync(t.manager.From(version, relativeN))
@@ -76,6 +76,15 @@ func (t *Tractor) Version() (uint64, error) {
 	return t.driver.Version()
 }
 
+func (t *Tractor) wrapAsyncError(err error) chan Result {
+	result := make(chan Result)
+	go func(result chan Result) {
+		result <- Result{nil, err}
+		close(result)
+	}(result)
+	return result
+}
+
 func (t *Tractor) applyAsync(files []*file.File) chan Result {
 	resultChan := make(chan Result)
 	go t.apply(files, resultChan)
@@ -83,6 +92,13 @@ func (t *Tractor) applyAsync(files []*file.File) chan Result {
 }
 
 func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
+	defer t.release()
+	if err := t.lock(); err != nil {
+		resultChan <- Result{nil, err}
+		close(resultChan)
+		return
+	}
+
 	for _, f := range files {
 		err := t.driver.Migrate(f)
 		resultChan <- Result{nil, err}
@@ -95,7 +111,15 @@ func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
 	close(resultChan)
 }
 
-func initDriver(url string)  (driver.Driver, error) {
+func (t *Tractor) lock() error {
+	return t.driver.Lock()
+}
+
+func (t *Tractor) release() error {
+	return t.driver.Release()
+}
+
+func initDriver(url string) (driver.Driver, error) {
 	u, err := neturl.Parse(url)
 	if err != nil {
 		return nil, err

@@ -1,7 +1,7 @@
 // Package driver holds the driver interface.
 package driver
 
-import	"github.com/netw00rk/sqltractor/tractor/file"
+import "github.com/netw00rk/sqltractor/tractor/file"
 
 // Driver is the interface type that needs to implemented by all drivers.
 type Driver interface {
@@ -26,4 +26,10 @@ type Driver interface {
 
 	// Version returns the current migration version.
 	Version() (uint64, error)
+
+	// Lock create lock table
+	Lock() error
+
+	// Release drops a lock table
+	Release() error
 }
