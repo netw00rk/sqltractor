@@ -20,7 +20,6 @@ type ManagerTestSuite struct {
 
 func (s *ManagerTestSuite) SetupSuite() {
 	s.path, _ = ioutil.TempDir("/tmp", "TestLookForMigrationFilesInSearchPath")
-	ioutil.WriteFile(path.Join(s.path, "nonsense.txt"), nil, 0755)
 	ioutil.WriteFile(path.Join(s.path, "001_migrationfile.up.sql"), nil, 0755)
 	ioutil.WriteFile(path.Join(s.path, "001_migrationfile.down.sql"), nil, 0755)
 	ioutil.WriteFile(path.Join(s.path, "002_migrationfile.up.sql"), nil, 0755)
@@ -31,7 +30,7 @@ func (s *ManagerTestSuite) SetupSuite() {
 	ioutil.WriteFile(path.Join(s.path, "401_migrationfile.down.sql"), []byte("test"), 0755)
 
 	var err error
-	s.manager, err = NewMigrationManager(s.path, "sql")
+	s.manager, err = NewMigrationManager(s.path)
 	s.Nil(err, "can not read migration files")
 }
 

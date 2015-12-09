@@ -15,10 +15,6 @@ type Driver interface {
 	// Close any open connection here.
 	Close() error
 
-	// FilenameExtension returns the extension of the migration files.
-	// The returned string must not begin with a dot.
-	FilenameExtension() string
-
 	// Migrate is the heart of the driver.
 	// It will receive a file which the driver should apply
 	// to its backend or whatever.

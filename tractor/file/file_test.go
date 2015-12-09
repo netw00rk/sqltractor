@@ -38,7 +38,7 @@ func (s *ParserTestSuite) Test() {
 		{"10034_test_file.down.sql", 10034, "test_file", direction.Down},
 	}
 
-	filenameRegex := regexp.MustCompile(fmt.Sprintf(filenameRegex, "sql"))
+	filenameRegex := regexp.MustCompile(filenameRegex)
 	for _, test := range tests {
 		version, name, direction, _ := parseFilenameSchema(test.filename, filenameRegex)
 		s.Equal(test.expectedVersion, version, "version numbers are not equal")

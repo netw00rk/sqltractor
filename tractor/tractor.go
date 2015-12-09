@@ -33,7 +33,7 @@ func NewTractor(url, path string) (*Tractor, error) {
 		return nil, err
 	}
 
-	t.manager, err = file.NewMigrationManager(path, t.driver.FilenameExtension())
+	t.manager, err = file.NewMigrationManager(path)
 	if err != nil {
 		return nil, err
 	}

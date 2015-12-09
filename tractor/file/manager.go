@@ -1,17 +1,16 @@
 package file
 
 import (
-	"sort"
 	"errors"
 	"regexp"
-	"fmt"
+	"sort"
 
 	"github.com/netw00rk/sqltractor/tractor/direction"
 	"github.com/netw00rk/sqltractor/tractor/file/reader"
 )
 
 var (
-	filenameRegex = `^([0-9]+)_(.*)\.(up|down)\.%s$`
+	filenameRegex     = `^([0-9]+)_(.*)\.(up|down)\..*$`
 	defaultFileReader reader.FileReader
 )
 
@@ -34,13 +33,13 @@ type Migration struct {
 type MigrationManager []*Migration
 
 // Initialize slice of Migration structures reads all migration files from a given path
-func NewMigrationManager(path, extension string) (MigrationManager, error) {
+func NewMigrationManager(path string) (MigrationManager, error) {
 	ioFiles, err := defaultFileReader.ReadPath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	filenameRegex := regexp.MustCompile(fmt.Sprintf(filenameRegex, extension))
+	filenameRegex := regexp.MustCompile(filenameRegex)
 	tmp := make(map[uint64]*Migration)
 	for _, file := range ioFiles {
 		version, name, d, err := parseFilenameSchema(file.Name(), filenameRegex)
@@ -80,7 +79,7 @@ func NewMigrationManager(path, extension string) (MigrationManager, error) {
 	}
 
 	newFiles := make(MigrationManager, len(tmp))
-	index := 0;
+	index := 0
 	for _, v := range tmp {
 		newFiles[index] = v
 		index++
@@ -89,7 +88,6 @@ func NewMigrationManager(path, extension string) (MigrationManager, error) {
 	sort.Sort(newFiles)
 	return newFiles, nil
 }
-
 
 // ToFirstFrom fetches all (down) migration files including the migration file
 // of the current version to the very first migration file.

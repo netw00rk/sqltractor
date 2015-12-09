@@ -68,12 +68,8 @@ func (driver *Driver) Close() error {
 	return nil
 }
 
-func (driver *Driver) FilenameExtension() string {
-	return "cql"
-}
-
 func (driver *Driver) Lock() error {
-	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN)", LOCK_TABLE)); err != nil {
+	if _, err := driver.session.Query(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN)", LOCK_TABLE)); err != nil {
 		return err
 	}
 
@@ -81,7 +77,7 @@ func (driver *Driver) Lock() error {
 }
 
 func (driver *Driver) Release() error {
-	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)); err != nil {
+	if _, err := driver.session.Query(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)); err != nil {
 		return err
 	}
 
@@ -113,7 +109,7 @@ func (driver *Driver) Migrate(f *file.File) error {
 
 func (driver *Driver) Version() (uint64, error) {
 	var version int64
-	err := driver.session.Query(fmt.Sprintf("SELECT version FROM %s WHERE versionRow = ?", TABLE_NAEM), VERSION_ROW).Scan(&version)
+	err := driver.session.Query(fmt.Sprintf("SELECT version FROM %s WHERE versionRow = ?", TABLE_NAME), VERSION_ROW).Scan(&version)
 	return uint64(version) - 1, err
 }
 

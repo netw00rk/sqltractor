@@ -53,10 +53,6 @@ func (driver *Driver) Close() error {
 	return nil
 }
 
-func (driver *Driver) FilenameExtension() string {
-	return "sql"
-}
-
 func (driver *Driver) Lock() error {
 	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN)", LOCK_TABLE)); err != nil {
 		return err
