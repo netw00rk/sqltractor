@@ -12,8 +12,8 @@ import (
 	"github.com/lib/pq"
 
 	"github.com/netw00rk/sqltractor/driver/registry"
-	"github.com/netw00rk/sqltractor/tractor/direction"
-	"github.com/netw00rk/sqltractor/tractor/file"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
+	"github.com/netw00rk/sqltractor/tractor/mimgration/file"
 )
 
 type Driver struct {

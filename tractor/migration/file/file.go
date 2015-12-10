@@ -11,10 +11,17 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netw00rk/sqltractor/tractor/direction"
-	"github.com/netw00rk/sqltractor/tractor/file/reader"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 )
 
+var (
+	filenameRegex = regexp.MustCompile(`^([0-9]+)_(.*)\.(up|down)\..*$`)
+	DefaultReader Reader
+)
+
+func SetDefaultReader(r Reader) {
+	DefaultReader = r
+}
 
 // File represents one file on disk.
 // Example: 001_initial_plan_to_do_sth.up.sql
@@ -38,10 +45,27 @@ type File struct {
 	Direction direction.Direction
 }
 
+func NewFile(fileName, path string) (*File, error) {
+	version, name, d, err := parseFilenameSchema(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &File{
+		Path:      path,
+		FileName:  fileName,
+		Version:   version,
+		Name:      name,
+		Content:   nil,
+		Direction: d,
+	}, nil
+
+}
+
 // ReadContent reads the file's content if the content is empty
 func (f *File) ReadContent() error {
 	if len(f.Content) == 0 {
-		content, err := defaultFileReader.ReadFileContent(path.Join(f.Path, f.FileName))
+		content, err := DefaultReader.ReadFileContent(path.Join(f.Path, f.FileName))
 		if err != nil {
 			return err
 		}
@@ -51,7 +75,7 @@ func (f *File) ReadContent() error {
 }
 
 // parseFilenameSchema parses the filename
-func parseFilenameSchema(filename string, filenameRegex *regexp.Regexp) (version uint64, name string, d direction.Direction, err error) {
+func parseFilenameSchema(filename string) (version uint64, name string, d direction.Direction, err error) {
 	matches := filenameRegex.FindStringSubmatch(filename)
 	if len(matches) != 4 {
 		return 0, "", 0, errors.New("Unable to parse filename schema")
@@ -121,7 +145,6 @@ func LinesBeforeAndAfter(data []byte, line, before, after int, lineNumbers bool)
 	return bytes.Join(newLines, []byte("\n"))
 }
 
-
 func init() {
-	SetFileReader(reader.IOFileReader{})
+	SetDefaultReader(IOReader{})
 }

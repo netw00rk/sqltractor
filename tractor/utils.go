@@ -1,7 +1,7 @@
 package tractor
 
 import (
-	"github.com/netw00rk/sqltractor/tractor/file"
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 // Utility function that wraps Tractor structure init and call UpAsync().

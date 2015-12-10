@@ -5,7 +5,8 @@ import (
 
 	"github.com/netw00rk/sqltractor/driver"
 	"github.com/netw00rk/sqltractor/driver/registry"
-	"github.com/netw00rk/sqltractor/tractor/file"
+	"github.com/netw00rk/sqltractor/tractor/migration"
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 // Structure for holding migration result
@@ -20,7 +21,7 @@ type Result struct {
 // Tractor is main structure to work with migration.
 type Tractor struct {
 	driver  driver.Driver
-	manager file.MigrationManager
+	manager migration.Manager
 }
 
 // Returns new pointer of Tractor struct or error
@@ -33,7 +34,7 @@ func NewTractor(url, path string) (*Tractor, error) {
 		return nil, err
 	}
 
-	t.manager, err = file.NewMigrationManager(path)
+	t.manager, err = migration.NewManager(path)
 	if err != nil {
 		return nil, err
 	}

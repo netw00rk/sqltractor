@@ -10,8 +10,8 @@ import (
 	"github.com/mattn/go-sqlite3"
 
 	"github.com/netw00rk/sqltractor/driver/registry"
-	"github.com/netw00rk/sqltractor/tractor/direction"
-	"github.com/netw00rk/sqltractor/tractor/file"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 type Driver struct {

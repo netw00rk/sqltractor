@@ -1,84 +1,45 @@
-package file
+package migration
 
 import (
 	"errors"
-	"regexp"
 	"sort"
 
-	"github.com/netw00rk/sqltractor/tractor/direction"
-	"github.com/netw00rk/sqltractor/tractor/file/reader"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
-var (
-	filenameRegex     = `^([0-9]+)_(.*)\.(up|down)\..*$`
-	defaultFileReader reader.FileReader
-)
-
-func SetFileReader(r reader.FileReader) {
-	defaultFileReader = r
-}
-
-type Migration struct {
-	// version of the migration file, parsed from the filenames
-	Version uint64
-
-	// reference to the *up* migration file
-	UpFile *File
-
-	// reference to the *down* migration file
-	DownFile *File
-}
-
-// MigrationManager is a slice of Migration
-type MigrationManager []*Migration
+// Manager is a slice of Migration
+type Manager []*Migration
 
 // Initialize slice of Migration structures reads all migration files from a given path
-func NewMigrationManager(path string) (MigrationManager, error) {
-	ioFiles, err := defaultFileReader.ReadPath(path)
+func NewManager(path string) (Manager, error) {
+	files, err := file.DefaultReader.ReadPath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	filenameRegex := regexp.MustCompile(filenameRegex)
 	tmp := make(map[uint64]*Migration)
-	for _, file := range ioFiles {
-		version, name, d, err := parseFilenameSchema(file.Name(), filenameRegex)
-		if err == nil {
-			var migrationFile *Migration
-			var ok bool
-			if migrationFile, ok = tmp[version]; !ok {
-				migrationFile = &(Migration{
-					Version: version,
-				})
-				tmp[version] = migrationFile
-			}
+	for _, file := range files {
+		var migration *Migration
+		var ok bool
+		if migration, ok = tmp[file.Version]; !ok {
+			migration = &(Migration{
+				Version: file.Version,
+			})
+			tmp[file.Version] = migration
+		}
 
-			switch d {
-			case direction.Up:
-				migrationFile.UpFile = &File{
-					Path:      path,
-					FileName:  file.Name(),
-					Version:   version,
-					Name:      name,
-					Content:   nil,
-					Direction: direction.Up,
-				}
-			case direction.Down:
-				migrationFile.DownFile = &File{
-					Path:      path,
-					FileName:  file.Name(),
-					Version:   version,
-					Name:      name,
-					Content:   nil,
-					Direction: direction.Down,
-				}
-			default:
-				return nil, errors.New("Unsupported direction.Direction Type")
-			}
+		switch file.Direction {
+		case direction.Up:
+			migration.UpFile = file
+		case direction.Down:
+			migration.DownFile = file
+		default:
+			return nil, errors.New("Unsupported direction.Direction Type")
 		}
 	}
 
-	newFiles := make(MigrationManager, len(tmp))
+	newFiles := make(Manager, len(tmp))
 	index := 0
 	for _, v := range tmp {
 		newFiles[index] = v
@@ -91,9 +52,9 @@ func NewMigrationManager(path string) (MigrationManager, error) {
 
 // ToFirstFrom fetches all (down) migration files including the migration file
 // of the current version to the very first migration file.
-func (mm MigrationManager) ToFirstFrom(version uint64) []*File {
+func (mm Manager) ToFirstFrom(version uint64) []*file.File {
 	sort.Sort(sort.Reverse(mm))
-	files := make([]*File, 0)
+	files := make([]*file.File, 0)
 	for _, migration := range mm {
 		if migration.Version <= version && migration.DownFile != nil {
 			files = append(files, migration.DownFile)
@@ -104,9 +65,9 @@ func (mm MigrationManager) ToFirstFrom(version uint64) []*File {
 
 // ToLastFrom fetches all (up) migration files to the most recent migration file.
 // The migration file of the current version is not included.
-func (mm MigrationManager) ToLastFrom(version uint64) []*File {
+func (mm Manager) ToLastFrom(version uint64) []*file.File {
 	sort.Sort(mm)
-	files := make([]*File, 0)
+	files := make([]*file.File, 0)
 	for _, migration := range mm {
 		if migration.Version > version && migration.UpFile != nil {
 			files = append(files, migration.UpFile)
@@ -123,8 +84,8 @@ func (mm MigrationManager) ToLastFrom(version uint64) []*File {
 // 		-1 will fetch the the previous down migration file
 // 		-2 will fetch the next two previous down migration files
 //		-n will fetch ...
-func (mm MigrationManager) From(version uint64, relativeN int) []*File {
-	files := make([]*File, 0)
+func (mm Manager) From(version uint64, relativeN int) []*file.File {
+	files := make([]*file.File, 0)
 
 	var d direction.Direction
 	if relativeN > 0 {
@@ -164,23 +125,19 @@ func (mm MigrationManager) From(version uint64, relativeN int) []*File {
 
 // Len is the number of elements in the collection.
 // Required by Sort Interface{}
-func (mm MigrationManager) Len() int {
+func (mm Manager) Len() int {
 	return len(mm)
 }
 
 // Less reports whether the element with
 // index i should sort before the element with index j.
 // Required by Sort Interface{}
-func (mm MigrationManager) Less(i, j int) bool {
+func (mm Manager) Less(i, j int) bool {
 	return mm[i].Version < mm[j].Version
 }
 
 // Swap swaps the elements with indexes i and j.
 // Required by Sort Interface{}
-func (mm MigrationManager) Swap(i, j int) {
+func (mm Manager) Swap(i, j int) {
 	mm[i], mm[j] = mm[j], mm[i]
-}
-
-func init() {
-	SetFileReader(reader.IOFileReader{})
 }

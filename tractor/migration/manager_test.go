@@ -1,4 +1,4 @@
-package file
+package migration
 
 import (
 	"fmt"
@@ -9,12 +9,12 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/netw00rk/sqltractor/tractor/direction"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 )
 
 type ManagerTestSuite struct {
 	suite.Suite
-	manager MigrationManager
+	manager Manager
 	path    string
 }
 
@@ -30,7 +30,7 @@ func (s *ManagerTestSuite) SetupSuite() {
 	ioutil.WriteFile(path.Join(s.path, "401_migrationfile.down.sql"), []byte("test"), 0755)
 
 	var err error
-	s.manager, err = NewMigrationManager(s.path)
+	s.manager, err = NewManager(s.path)
 	s.Nil(err, "can not read migration files")
 }
 

@@ -1,28 +1,24 @@
 package file
 
 import (
-	"fmt"
-	"os"
-	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/netw00rk/sqltractor/tractor/direction"
-	"github.com/netw00rk/sqltractor/tractor/file/reader"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 )
 
 type ParserTestSuite struct {
 	suite.Suite
 }
 
-type MockFileReader struct{}
+type MockReader struct{}
 
-func (m MockFileReader) ReadFileContent(path string) ([]byte, error) {
+func (m MockReader) ReadFileContent(path string) ([]byte, error) {
 	return []byte("test"), nil
 }
 
-func (m MockFileReader) ReadPath(path string) ([]os.FileInfo, error) {
+func (m MockReader) ReadPath(path string) ([]*File, error) {
 	return nil, nil
 }
 
@@ -38,23 +34,23 @@ func (s *ParserTestSuite) Test() {
 		{"10034_test_file.down.sql", 10034, "test_file", direction.Down},
 	}
 
-	filenameRegex := regexp.MustCompile(filenameRegex)
 	for _, test := range tests {
-		version, name, direction, _ := parseFilenameSchema(test.filename, filenameRegex)
-		s.Equal(test.expectedVersion, version, "version numbers are not equal")
-		s.Equal(test.expectedName, name, "name are not equal")
-		s.Equal(test.expectedDirection, direction, "directions are not equal")
+		file, err := NewFile(test.filename, "")
+		s.Nil(err, "can't parse filename")
+		s.Equal(test.expectedVersion, file.Version, "version numbers are not equal")
+		s.Equal(test.expectedName, file.Name, "name are not equal")
+		s.Equal(test.expectedDirection, file.Direction, "directions are not equal")
 	}
 }
 
 func (s *ParserTestSuite) TestReadContent() {
-	SetFileReader(MockFileReader{})
+	SetDefaultReader(MockReader{})
 
 	file := new(File)
 	file.ReadContent()
 	s.Equal([]byte("test"), file.Content)
 
-	SetFileReader(reader.IOFileReader{})
+	SetDefaultReader(IOReader{})
 }
 
 func (s *ParserTestSuite) TestInvalidNames() {
@@ -62,9 +58,8 @@ func (s *ParserTestSuite) TestInvalidNames() {
 		"-1_test_file.down.sql", "test_file.down.sql", "100_test_file.down",
 		"100_test_file.sql", "100_test_file", "test_file", "100", ".sql", "up.sql", "down.sql"}
 
-	filenameRegex := regexp.MustCompile(fmt.Sprintf(filenameRegex, "sql"))
 	for _, test := range tests {
-		_, _, _, err := parseFilenameSchema(test, filenameRegex)
+		_, err := NewFile(test, "")
 		s.NotNil(err, "parsing error is nul")
 	}
 }
