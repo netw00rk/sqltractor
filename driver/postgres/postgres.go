@@ -13,7 +13,7 @@ import (
 
 	"github.com/netw00rk/sqltractor/driver/registry"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
-	"github.com/netw00rk/sqltractor/tractor/mimgration/file"
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 type Driver struct {
