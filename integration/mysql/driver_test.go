@@ -40,7 +40,7 @@ func (s *MysqlTestSuite) SetupSuite() {
 
 	s.connection, _ = sql.Open("mysql", CONNECTION_URL)
 	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(integration.NewMapFileReader(files))
+	file.SetDefaultReader(file.NewMemoryReader(files))
 }
 
 func (s *MysqlTestSuite) SetupTest() {

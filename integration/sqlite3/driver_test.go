@@ -37,7 +37,7 @@ type SqliteTestSuite struct {
 
 func (s *SqliteTestSuite) SetupSuite() {
 	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(integration.NewMapFileReader(files))
+	file.SetDefaultReader(file.NewMemoryReader(files))
 }
 
 func (s *SqliteTestSuite) TearDownSuite() {

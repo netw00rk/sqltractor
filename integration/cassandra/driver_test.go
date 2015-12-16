@@ -38,7 +38,7 @@ type CassandraTestSuite struct {
 func (s *CassandraTestSuite) SetupSuite() {
 	s.DriverTestSuite.SetupSuite()
 	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(integration.NewMapFileReader(files))
+	file.SetDefaultReader(file.NewMemoryReader(files))
 
 	cluster := gocql.NewCluster("localhost")
 	cluster.Consistency = gocql.All

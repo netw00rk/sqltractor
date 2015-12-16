@@ -40,7 +40,7 @@ func (s *PostgresTestSuite) SetupSuite() {
 
 	s.connection, _ = sql.Open("postgres", CONNECTION_URL)
 	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(integration.NewMapFileReader(files))
+	file.SetDefaultReader(file.NewMemoryReader(files))
 }
 
 func (s *PostgresTestSuite) SetupTest() {
