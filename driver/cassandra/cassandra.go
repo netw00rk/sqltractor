@@ -52,7 +52,6 @@ func (driver *Driver) Initialize(rawurl string) error {
 	}
 
 	driver.session, err = cluster.CreateSession()
-
 	if err != nil {
 		return err
 	}
@@ -69,7 +68,7 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) Lock() error {
-	if _, err := driver.session.Query(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN)", LOCK_TABLE)); err != nil {
+	if err := driver.session.Query(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN PRIMARY KEY)", LOCK_TABLE)).Exec(); err != nil {
 		return err
 	}
 
@@ -77,7 +76,7 @@ func (driver *Driver) Lock() error {
 }
 
 func (driver *Driver) Release() error {
-	if _, err := driver.session.Query(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)); err != nil {
+	if err := driver.session.Query(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)).Exec(); err != nil {
 		return err
 	}
 

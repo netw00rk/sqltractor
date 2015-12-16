@@ -1,0 +1,10 @@
+Vagrant.configure("2") do |config|
+    config.vm.provider "docker" do |d|
+        d.image = "mysql"
+        d.ports = ["3308:3306"]
+        d.env["MYSQL_DATABASE"] = "integration_test"
+        d.env["MYSQL_ALLOW_EMPTY_PASSWORD"] = "yes"
+    end
+
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+end

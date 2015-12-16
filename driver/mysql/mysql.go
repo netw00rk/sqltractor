@@ -58,7 +58,7 @@ func (driver *Driver) Close() error {
 }
 
 func (driver *Driver) Lock() error {
-	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (lock BOOLEAN NOT NULL)", LOCK_TABLE_NAME)); err != nil {
+	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (`lock` BOOLEAN)", LOCK_TABLE_NAME)); err != nil {
 		return err
 	}
 

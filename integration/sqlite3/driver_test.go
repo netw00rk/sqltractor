@@ -2,17 +2,17 @@ package postgres
 
 import (
 	"database/sql"
+	"os"
 	"testing"
 
-	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/suite"
 
-	_ "github.com/netw00rk/sqltractor/driver/postgres"
+	_ "github.com/netw00rk/sqltractor/driver/sqlite3"
 	"github.com/netw00rk/sqltractor/integration"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
-const CONNECTION_URL = "postgres://postgres@localhost:6032/integration_test?sslmode=disable"
+const CONNECTION_URL = "sqlite3://integration_test.sqlite3"
 
 var files map[string][]byte = map[string][]byte{
 	"001_test.up.sql": []byte(`
@@ -30,28 +30,20 @@ INSERT INTO test_table_2 (id) VALUES (1);`),
 	"002_test.down.sql": []byte(``),
 }
 
-type PostgresTestSuite struct {
+type SqliteTestSuite struct {
 	integration.DriverTestSuite
 	connection *sql.DB
 }
 
-func (s *PostgresTestSuite) SetupSuite() {
-	s.DriverTestSuite.SetupSuite()
-
-	s.connection, _ = sql.Open("postgres", CONNECTION_URL)
+func (s *SqliteTestSuite) SetupSuite() {
 	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
 	file.SetDefaultReader(integration.NewMapFileReader(files))
 }
 
-func (s *PostgresTestSuite) SetupTest() {
-	s.connection.Exec("DROP SCHEMA public CASCADE")
-	s.connection.Exec("CREATE SCHEMA public")
+func (s *SqliteTestSuite) TearDownSuite() {
+	os.Remove("integration_test.sqlite3")
 }
 
-func (s *PostgresTestSuite) TearDownSuite() {
-	s.DriverTestSuite.TearDownSuite()
-}
-
-func TestPostgresTestSuite(t *testing.T) {
-	suite.Run(t, new(PostgresTestSuite))
+func TestSqliteTestSuite(t *testing.T) {
+	suite.Run(t, new(SqliteTestSuite))
 }

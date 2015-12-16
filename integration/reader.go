@@ -1,39 +1,34 @@
 package integration
 
 import (
-	"os"
+	"errors"
+	"path"
+
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
-type MockFileInfo struct {
-	Name string
-}
-
-func (fi MockFileInfo) Name() string {
-	return fi.Name
-}
-
-func (fi MockFileInfo) Size() int64 {
-	return 0
-}
-
-func (fi MockFileInfo) Mode() os.FileMode {
-	return os.ModeAppend
-}
-
-func (fi MockFileInfo) ModeTime()
-
 type MapFileReader struct {
-	files map[string]byte
+	files map[string][]byte
 }
 
-func NewMapFileReader(files map[string]byte) MapFileReader {
-	return MapFileReader(files)
+func NewMapFileReader(files map[string][]byte) MapFileReader {
+	return MapFileReader{files}
 }
 
-func (m MockFileReader) ReadFileContent(path string) ([]byte, error) {
-	return []byte("test"), nil
+func (m MapFileReader) ReadFileContent(file string) ([]byte, error) {
+	if content, ok := m.files[path.Base(file)]; ok {
+		return content, nil
+	}
+	return nil, errors.New("can't find file")
 }
 
-func (m MockFileReader) ReadPath(path string) ([]os.FileInfo, error) {
-	return nil, nil
+func (m MapFileReader) ReadPath(path string) ([]*file.File, error) {
+	result := make([]*file.File, 0, len(m.files))
+	for k := range m.files {
+		if file, err := file.NewFile(k, ""); err == nil {
+			result = append(result, file)
+		}
+	}
+
+	return result, nil
 }

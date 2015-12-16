@@ -1,8 +1,7 @@
 Vagrant.configure("2") do |config|
     config.vm.provider "docker" do |d|
-        d.image = "postgres"
-        d.ports = ["6032:5432"]
-        d.env["POSTGRES_DB"] = "integration_test"
+        d.image = "cassandra:2.2.4"
+        d.ports = ["9160:9160", "9042:9042", "7000:7000", "7001:7001", "7199:7199"]
     end
 
     config.vm.synced_folder ".", "/vagrant", disabled: true

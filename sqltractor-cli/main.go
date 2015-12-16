@@ -11,8 +11,8 @@ import (
 	"github.com/fatih/color"
 
 	"github.com/netw00rk/sqltractor/tractor"
-	"github.com/netw00rk/sqltractor/tractor/direction"
-	"github.com/netw00rk/sqltractor/tractor/file"
+	"github.com/netw00rk/sqltractor/tractor/migration/direction"
+	"github.com/netw00rk/sqltractor/tractor/migration/file"
 
 	_ "github.com/netw00rk/sqltractor/driver/cassandra"
 	_ "github.com/netw00rk/sqltractor/driver/mysql"

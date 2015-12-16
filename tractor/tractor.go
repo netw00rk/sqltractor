@@ -93,9 +93,9 @@ func (t *Tractor) applyAsync(files []*file.File) chan Result {
 }
 
 func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
-	defer t.release()
 	if err := t.lock(); err != nil {
 		resultChan <- Result{nil, err}
+		t.release()
 		close(resultChan)
 		return
 	}
@@ -105,10 +105,13 @@ func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
 		resultChan <- Result{nil, err}
 
 		if err != nil {
+			t.release()
 			close(resultChan)
 			return
 		}
 	}
+
+	t.release()
 	close(resultChan)
 }
 
