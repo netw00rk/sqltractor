@@ -14,6 +14,7 @@ sqltractor-cli -url postgres://user@host:port/database -path ./db/migrations cre
 sqltractor-cli -url postgres://user@host:port/database -path ./db/migrations up
 sqltractor-cli -url postgres://user@host:port/database?search_path=name -path ./db/migrations up # with custom search_path
 sqltractor-cli help # for more info
+```
 
 ## Authors
 
