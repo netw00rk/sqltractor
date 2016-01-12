@@ -53,7 +53,7 @@ import "github.com/netw00rk/sqltractor/reader/file"
 func main() {
     // create tractor struct
     t := &tractor.SqlTractor{
-        Driver: driver.New("driver://url")
+        Driver: postgres.New("driver://url")
         Reader: file.NewFileReader("./path/to/migration/files")
     }
 
@@ -62,7 +62,7 @@ func main() {
     //    File  // applied file
     //    Error // error if something happened
     //}
-    for r := range tractor.UpAsync() {
+    for r := range t.UpAsync() {
         if r.Error != nil {
             if r.File != nil {
                 fmt.Printf("Error %s while applying file %s", r.Error, r.File.FileName)
