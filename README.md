@@ -2,15 +2,6 @@
 
 SQL schema migration tool for Go. Use it in your existing Go code or run commands via the CLI.
 
-## Available Drivers
-
- * [PostgreSQL](https://github.com/netw00rk/sqltractor/tree/master/driver/postgres)
- * [Cassandra](https://github.com/netw00rk/sqltractor/tree/master/driver/cassandra)
- * [SQLite](https://github.com/netw00rk/sqltractor/tree/master/driver/sqlite3)
- * [MySQL](https://github.com/netw00rk/sqltractor/tree/master/driver/mysql) (experimental)
-
-Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/netw00rk/sqltractor/driver#Driver) and open a PR.
-
 ## Usage
 
 **from Terminal**
@@ -54,34 +45,54 @@ See GoDoc here: http://godoc.org/github.com/netw00rk/sqltractor/tractor
 ```go
 import "github.com/netw00rk/sqltractor/tractor"
 
-// Import any required drivers so that they are registered and available
-import _ "github.com/netw00rk/sqltractor/driver/postgres"
+// Import required driver and reader
+import "github.com/netw00rk/sqltractor/driver/postgres"
+import "github.com/netw00rk/sqltractor/reader/file"
 
-// use synchronous versions of migration functions that
-// return slice of applied migration files and error
-files, err := tractor.Up("driver://url", "./path")
-if err != nil {
-  // do something with error
-}
 
-// to use the asynchronous version you have to instantiate Tractor structure
-tractor, err := tractor.NewTractor("driver://url", "./path")
-if err != nil {
-  // do something with error
-}
-
-// UpAsync returning chan of Result structure
-// type Result struct {
-//    File  // applied file
-//    Error // error if something happened
-//}
-for r := range tractor.UpAsync() {
-    if r.Error != nil {
-        // do something with error
+func main() {
+    // create tractor struct
+    t := &tractor.SqlTractor{
+        Driver: driver.New("driver://url")
+        Reader: file.NewFileReader("./path/to/migration/files")
     }
-    // do something with applied file
+
+    // UpAsync returning chan of Result structure
+    // type Result struct {
+    //    File  // applied file
+    //    Error // error if something happened
+    //}
+    for r := range tractor.UpAsync() {
+        if r.Error != nil {
+            if r.File != nil {
+                fmt.Printf("Error %s while applying file %s", r.Error, r.File.FileName)
+            }
+        }
+        // do something with applied file
+    }
+
+    // usage of synchronous wrapper that
+    // return slice of applied migration files and error
+    files, err := tractor.Up(t)
+    if err != nil {
+      // do something with error
+    }
 }
 ```
+
+## Available Drivers
+
+ * [PostgreSQL](https://github.com/netw00rk/sqltractor/tree/master/driver/postgres)
+ * [Cassandra](https://github.com/netw00rk/sqltractor/tree/master/driver/cassandra)
+ * [SQLite](https://github.com/netw00rk/sqltractor/tree/master/driver/sqlite3)
+ * [MySQL](https://github.com/netw00rk/sqltractor/tree/master/driver/mysql) (experimental)
+
+Need another driver? Just implement the [Driver interface](http://godoc.org/github.com/netw00rk/sqltractor/driver#Driver) and open a PR.
+
+## Avaiable readers
+
+ * [FileReader](https://github.com/netw00rk/sqltractor/tree/master/reader/file)
+ * [MemoryReader](https://github.com/netw00rk/sqltractor/tree/master/reader/memory)
 
 ## Migration files
 

@@ -12,14 +12,8 @@ type ParserTestSuite struct {
 	suite.Suite
 }
 
-type MockReader struct{}
-
-func (m MockReader) ReadFileContent(path string) ([]byte, error) {
+func MockedContentFunc() ([]byte, error) {
 	return []byte("test"), nil
-}
-
-func (m MockReader) ReadPath(path string) ([]*File, error) {
-	return nil, nil
 }
 
 func (s *ParserTestSuite) Test() {
@@ -35,7 +29,7 @@ func (s *ParserTestSuite) Test() {
 	}
 
 	for _, test := range tests {
-		file, err := NewFile(test.filename, "")
+		file, err := NewFile(test.filename, MockedContentFunc)
 		s.Nil(err, "can't parse filename")
 		s.Equal(test.expectedVersion, file.Version, "version numbers are not equal")
 		s.Equal(test.expectedName, file.Name, "name are not equal")
@@ -44,13 +38,10 @@ func (s *ParserTestSuite) Test() {
 }
 
 func (s *ParserTestSuite) TestReadContent() {
-	SetDefaultReader(MockReader{})
-
 	file := new(File)
-	file.ReadContent()
-	s.Equal([]byte("test"), file.Content)
-
-	SetDefaultReader(IOReader{})
+	file.ContentFunc = MockedContentFunc
+	content, _ := file.Content()
+	s.Equal([]byte("test"), content)
 }
 
 func (s *ParserTestSuite) TestInvalidNames() {
@@ -59,7 +50,7 @@ func (s *ParserTestSuite) TestInvalidNames() {
 		"100_test_file.sql", "100_test_file", "test_file", "100", ".sql", "up.sql", "down.sql"}
 
 	for _, test := range tests {
-		_, err := NewFile(test, "")
+		_, err := NewFile(test, MockedContentFunc)
 		s.NotNil(err, "parsing error is nul")
 	}
 }

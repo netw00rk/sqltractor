@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/netw00rk/sqltractor/reader"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
@@ -12,8 +13,8 @@ import (
 type Manager []*Migration
 
 // Initialize slice of Migration structures reads all migration files from a given path
-func NewManager(path string) (Manager, error) {
-	files, err := file.DefaultReader.ReadPath(path)
+func NewManager(reader reader.Reader) (Manager, error) {
+	files, err := reader.Read()
 	if err != nil {
 		return nil, err
 	}

@@ -7,9 +7,9 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/suite"
 
-	_ "github.com/netw00rk/sqltractor/driver/postgres"
+	"github.com/netw00rk/sqltractor/driver/postgres"
 	"github.com/netw00rk/sqltractor/integration"
-	"github.com/netw00rk/sqltractor/tractor/migration/file"
+	"github.com/netw00rk/sqltractor/reader/memory"
 )
 
 const CONNECTION_URL = "postgres://postgres@localhost:6032/integration_test?sslmode=disable"
@@ -38,14 +38,25 @@ type PostgresTestSuite struct {
 func (s *PostgresTestSuite) SetupSuite() {
 	s.DriverTestSuite.SetupSuite()
 
-	s.connection, _ = sql.Open("postgres", CONNECTION_URL)
-	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(file.NewMemoryReader(files))
+	err := integration.RepeatWhileError(func() error {
+		var err error
+		if s.connection, err = sql.Open("postgres", CONNECTION_URL); err != nil {
+			return err
+		}
+		return s.connection.Ping()
+	})
+
+	if err != nil {
+		s.Fail(err.Error())
+	}
 }
 
 func (s *PostgresTestSuite) SetupTest() {
 	s.connection.Exec("DROP SCHEMA public CASCADE")
 	s.connection.Exec("CREATE SCHEMA public")
+
+	s.DriverTestSuite.Driver = postgres.New(CONNECTION_URL)
+	s.DriverTestSuite.Reader = memory.NewMemoryReader(files)
 }
 
 func (s *PostgresTestSuite) TearDownSuite() {

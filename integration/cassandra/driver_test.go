@@ -9,9 +9,9 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/stretchr/testify/suite"
 
-	_ "github.com/netw00rk/sqltractor/driver/cassandra"
+	"github.com/netw00rk/sqltractor/driver/cassandra"
 	"github.com/netw00rk/sqltractor/integration"
-	"github.com/netw00rk/sqltractor/tractor/migration/file"
+	"github.com/netw00rk/sqltractor/reader/memory"
 )
 
 const CONNECTION_URL = "cassandra://localhost/integration_test"
@@ -37,24 +37,23 @@ type CassandraTestSuite struct {
 
 func (s *CassandraTestSuite) SetupSuite() {
 	s.DriverTestSuite.SetupSuite()
-	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(file.NewMemoryReader(files))
-
 	cluster := gocql.NewCluster("localhost")
 	cluster.Consistency = gocql.All
 	cluster.Timeout = 1 * time.Minute
 
-	for {
-		if session, err := cluster.CreateSession(); err == nil {
-			s.session = session
-			break
-		}
-	}
+	err := integration.RepeatWhileError(func() error {
+		var err error
+		s.session, err = cluster.CreateSession()
+		return err
+	})
+	s.Nil(err)
 
 	s.session.Query("CREATE KEYSPACE integration_test WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }").Exec()
 }
 
 func (s *CassandraTestSuite) SetupTest() {
+	s.DriverTestSuite.Driver = cassandra.New(CONNECTION_URL)
+	s.DriverTestSuite.Reader = memory.NewMemoryReader(files)
 }
 
 func (s *CassandraTestSuite) TearDownSuite() {

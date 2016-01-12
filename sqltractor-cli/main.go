@@ -2,25 +2,29 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/fatih/color"
 
+	reader "github.com/netw00rk/sqltractor/reader/file"
 	"github.com/netw00rk/sqltractor/tractor"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 
-	_ "github.com/netw00rk/sqltractor/driver/cassandra"
-	_ "github.com/netw00rk/sqltractor/driver/mysql"
-	_ "github.com/netw00rk/sqltractor/driver/postgres"
-	_ "github.com/netw00rk/sqltractor/driver/sqlite3"
+	"github.com/netw00rk/sqltractor/driver"
+	"github.com/netw00rk/sqltractor/driver/cassandra"
+	"github.com/netw00rk/sqltractor/driver/mysql"
+	"github.com/netw00rk/sqltractor/driver/postgres"
+	"github.com/netw00rk/sqltractor/driver/sqlite3"
 )
 
-var url = flag.String("url", os.Getenv("MIGRATE_URL"), "")
+var connectionUrl = flag.String("url", os.Getenv("MIGRATE_URL"), "")
 var path = flag.String("path", "", "")
 
 func main() {
@@ -39,10 +43,15 @@ func main() {
 		}
 	}
 
-	tractor, err := tractor.NewTractor(*url, *path)
+	driver, err := getDriver(*connectionUrl)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	tractor := &tractor.SqlTractor{
+		Driver: driver,
+		Reader: reader.NewFileReader(*path),
 	}
 
 	switch command {
@@ -143,6 +152,26 @@ func printTimer(start time.Time) {
 	} else {
 		fmt.Printf("\n%.4f seconds\n", diff)
 	}
+}
+
+func getDriver(rawurl string) (driver.Driver, error) {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+
+	switch u.Scheme {
+	case "cassandra":
+		return cassandra.New(rawurl), nil
+	case "postgres":
+		return postgres.New(rawurl), nil
+	case "mysql":
+		return mysql.New(rawurl), nil
+	case "sqlite3":
+		return sqlite3.New(rawurl), nil
+	}
+
+	return nil, errors.New(fmt.Sprintf("Can't finde driver for scheme %s", u.Scheme))
 }
 
 func printHelpCmd() {

@@ -13,13 +13,13 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"github.com/netw00rk/sqltractor/driver/registry"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 type Driver struct {
-	db *sql.DB
+	db  *sql.DB
+	url string
 }
 
 const (
@@ -29,8 +29,24 @@ const (
 
 var errRegexp, _ = regexp.Compile(`at line ([0-9]+)$`)
 
-func (driver *Driver) Initialize(url string) error {
-	urlWithoutScheme := strings.SplitN(url, "mysql://", 2)
+func New(url string) *Driver {
+	return &Driver{
+		url: url,
+	}
+}
+
+func FromConnection(db *sql.DB) *Driver {
+	return &Driver{
+		db: db,
+	}
+}
+
+func (driver *Driver) Initialize() error {
+	if driver.db != nil {
+		return nil
+	}
+
+	urlWithoutScheme := strings.SplitN(driver.url, "mysql://", 2)
 	if len(urlWithoutScheme) != 2 {
 		return errors.New("invalid mysql:// scheme")
 	}
@@ -97,13 +113,14 @@ func (driver *Driver) Migrate(f *file.File) error {
 		}
 	}
 
-	if err := f.ReadContent(); err != nil {
+	content, err := f.Content()
+	if err != nil {
 		return err
 	}
 
 	// TODO this is not good! unfortunately there is no mysql driver that
 	// supports multiple statements per query.
-	sqlStmts := bytes.Split(f.Content, []byte(";"))
+	sqlStmts := bytes.Split(content, []byte(";"))
 	for _, sqlStmt := range sqlStmts {
 		sqlStmt = bytes.TrimSpace(sqlStmt)
 		if len(sqlStmt) > 0 {
@@ -116,7 +133,7 @@ func (driver *Driver) Migrate(f *file.File) error {
 					}
 					if err == nil {
 						// get white-space offset
-						// TODO this is broken, because we use sqlStmt instead of f.Content
+						// TODO this is broken, because we use sqlStmt instead of content
 						wsLineOffset := 0
 						b := bufio.NewReader(bytes.NewBuffer(sqlStmt))
 						for {
@@ -177,8 +194,4 @@ func (driver *Driver) ensureVersionTableExists() error {
 	}
 
 	return nil
-}
-
-func init() {
-	registry.RegisterDriver("mysql", new(Driver))
 }

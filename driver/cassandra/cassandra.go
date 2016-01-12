@@ -9,13 +9,13 @@ import (
 
 	"github.com/gocql/gocql"
 
-	"github.com/netw00rk/sqltractor/driver/registry"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 type Driver struct {
 	session *gocql.Session
+	url     string
 }
 
 const (
@@ -29,8 +29,24 @@ const (
 //
 // Example:
 // cassandra://localhost/SpaceOfKeys
-func (driver *Driver) Initialize(rawurl string) error {
-	u, err := url.Parse(rawurl)
+func New(url string) *Driver {
+	return &Driver{
+		url: url,
+	}
+}
+
+func FromSession(session *gocql.Session) *Driver {
+	return &Driver{
+		session: session,
+	}
+}
+
+func (driver *Driver) Initialize() error {
+	if driver.session != nil {
+		return nil
+	}
+
+	u, err := url.Parse(driver.url)
 
 	cluster := gocql.NewCluster(u.Host)
 	cluster.Keyspace = u.Path[1:len(u.Path)]
@@ -59,6 +75,7 @@ func (driver *Driver) Initialize(rawurl string) error {
 	if err := driver.ensureVersionTableExists(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -84,11 +101,12 @@ func (driver *Driver) Release() error {
 }
 
 func (driver *Driver) Migrate(f *file.File) error {
-	if err := f.ReadContent(); err != nil {
+	content, err := f.Content()
+	if err != nil {
 		return err
 	}
 
-	for _, query := range strings.Split(string(f.Content), ";") {
+	for _, query := range strings.Split(string(content), ";") {
 		query = strings.TrimSpace(query)
 		if len(query) == 0 {
 			continue
@@ -135,8 +153,4 @@ func (driver *Driver) version(d direction.Direction) error {
 		stmt = DOWN
 	}
 	return driver.session.Query(stmt.String(), VERSION_ROW).Exec()
-}
-
-func init() {
-	registry.RegisterDriver("cassandra", new(Driver))
 }

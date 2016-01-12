@@ -1,10 +1,8 @@
 package tractor
 
 import (
-	neturl "net/url"
-
 	"github.com/netw00rk/sqltractor/driver"
-	"github.com/netw00rk/sqltractor/driver/registry"
+	"github.com/netw00rk/sqltractor/reader"
 	"github.com/netw00rk/sqltractor/tractor/migration"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
@@ -18,66 +16,86 @@ type Result struct {
 	Error error
 }
 
-// Tractor is main structure to work with migration.
-type Tractor struct {
-	driver  driver.Driver
-	manager migration.Manager
+// Tractor interface
+type Tractor interface {
+	UpAsync() chan Result
+	DownAsync() chan Result
+	MigrateAsync(int) chan Result
+	Version() (uint64, error)
 }
 
-// Returns new pointer of Tractor struct or error
-func NewTractor(url, path string) (*Tractor, error) {
-	var err error
+// SqlTractor is main structure to work with migration.
+type SqlTractor struct {
+	Driver driver.Driver
+	Reader reader.Reader
 
-	t := new(Tractor)
-	t.driver, err = initDriver(url)
-	if err != nil {
-		return nil, err
+	_manager migration.Manager
+}
+
+// Returns new pointer of SqlTractor struct or error
+func NewSqlTractor(driver driver.Driver, reader reader.Reader) Tractor {
+	return &SqlTractor{
+		Driver: driver,
+		Reader: reader,
 	}
-
-	t.manager, err = migration.NewManager(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return t, nil
 }
 
 // Applies all available migrations asynchronously
-func (t *Tractor) UpAsync() chan Result {
-	version, err := t.driver.Version()
+func (t *SqlTractor) UpAsync() chan Result {
+	version, err := t.Version()
 	if err != nil {
 		return t.wrapAsyncError(err)
 	}
 
-	return t.applyAsync(t.manager.ToLastFrom(version))
+	manager, err := t.manager()
+	if err != nil {
+		return t.wrapAsyncError(err)
+	}
+
+	return t.applyAsync(manager.ToLastFrom(version))
 }
 
 // Rolls back all migrations asynchronously
-func (t *Tractor) DownAsync() chan Result {
-	version, err := t.driver.Version()
+func (t *SqlTractor) DownAsync() chan Result {
+	version, err := t.Version()
 	if err != nil {
 		return t.wrapAsyncError(err)
 	}
 
-	return t.applyAsync(t.manager.ToFirstFrom(version))
+	manager, err := t.manager()
+	if err != nil {
+		return t.wrapAsyncError(err)
+	}
+
+	return t.applyAsync(manager.ToFirstFrom(version))
 }
 
 // Applies relative +n/-n migrations asynchronously
-func (t *Tractor) MigrateAsync(relativeN int) chan Result {
-	version, err := t.driver.Version()
+func (t *SqlTractor) MigrateAsync(relativeN int) chan Result {
+	version, err := t.Version()
 	if err != nil {
 		return t.wrapAsyncError(err)
 	}
 
-	return t.applyAsync(t.manager.From(version, relativeN))
+	manager, err := t.manager()
+	if err != nil {
+		return t.wrapAsyncError(err)
+	}
+
+	return t.applyAsync(manager.From(version, relativeN))
 }
 
 // Returns the current migration version
-func (t *Tractor) Version() (uint64, error) {
-	return t.driver.Version()
+func (t *SqlTractor) Version() (uint64, error) {
+	driver, err := t.driver()
+	if err != nil {
+		return 0, err
+	}
+
+	return driver.Version()
 }
 
-func (t *Tractor) wrapAsyncError(err error) chan Result {
+func (t *SqlTractor) wrapAsyncError(err error) chan Result {
 	result := make(chan Result)
 	go func(result chan Result) {
 		result <- Result{nil, err}
@@ -86,13 +104,13 @@ func (t *Tractor) wrapAsyncError(err error) chan Result {
 	return result
 }
 
-func (t *Tractor) applyAsync(files []*file.File) chan Result {
+func (t *SqlTractor) applyAsync(files []*file.File) chan Result {
 	resultChan := make(chan Result)
 	go t.apply(files, resultChan)
 	return resultChan
 }
 
-func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
+func (t *SqlTractor) apply(files []*file.File, resultChan chan Result) {
 	if err := t.lock(); err != nil {
 		resultChan <- Result{nil, err}
 		t.release()
@@ -100,8 +118,16 @@ func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
 		return
 	}
 
+	driver, err := t.driver()
+	if err != nil {
+		resultChan <- Result{nil, err}
+		t.release()
+		close(resultChan)
+		return
+	}
+
 	for _, f := range files {
-		err := t.driver.Migrate(f)
+		err := driver.Migrate(f)
 		resultChan <- Result{nil, err}
 
 		if err != nil {
@@ -115,28 +141,37 @@ func (t *Tractor) apply(files []*file.File, resultChan chan Result) {
 	close(resultChan)
 }
 
-func (t *Tractor) lock() error {
-	return t.driver.Lock()
+func (t *SqlTractor) lock() error {
+	driver, err := t.driver()
+	if err != nil {
+		return err
+	}
+
+	return driver.Lock()
 }
 
-func (t *Tractor) release() error {
-	return t.driver.Release()
+func (t *SqlTractor) release() error {
+	driver, err := t.driver()
+	if err != nil {
+		return err
+	}
+
+	return driver.Release()
 }
 
-func initDriver(url string) (driver.Driver, error) {
-	u, err := neturl.Parse(url)
-	if err != nil {
+func (t *SqlTractor) manager() (migration.Manager, error) {
+	var err error
+	if t._manager == nil {
+		t._manager, err = migration.NewManager(t.Reader)
+	}
+
+	return t._manager, err
+}
+
+func (t *SqlTractor) driver() (driver.Driver, error) {
+	if err := t.Driver.Initialize(); err != nil {
 		return nil, err
 	}
 
-	d, err := registry.GetDriver(u.Scheme)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := d.Initialize(url); err != nil {
-		return nil, err
-	}
-
-	return d, nil
+	return t.Driver, nil
 }

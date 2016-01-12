@@ -9,7 +9,7 @@ type Driver interface {
 	// Initialize is the first function to be called.
 	// Check the url string and open and verify any connection
 	// that has to be made.
-	Initialize(url string) error
+	Initialize() error
 
 	// Close is the last function to be called.
 	// Close any open connection here.

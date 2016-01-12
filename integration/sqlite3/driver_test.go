@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	_ "github.com/netw00rk/sqltractor/driver/sqlite3"
+	"github.com/netw00rk/sqltractor/driver/sqlite3"
 	"github.com/netw00rk/sqltractor/integration"
-	"github.com/netw00rk/sqltractor/tractor/migration/file"
+	"github.com/netw00rk/sqltractor/reader/memory"
 )
 
 const CONNECTION_URL = "sqlite3://integration_test.sqlite3"
@@ -36,8 +36,8 @@ type SqliteTestSuite struct {
 }
 
 func (s *SqliteTestSuite) SetupSuite() {
-	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(file.NewMemoryReader(files))
+	s.DriverTestSuite.Driver = sqlite3.New(CONNECTION_URL)
+	s.DriverTestSuite.Reader = memory.NewMemoryReader(files)
 }
 
 func (s *SqliteTestSuite) TearDownSuite() {

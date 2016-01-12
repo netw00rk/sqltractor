@@ -11,13 +11,13 @@ import (
 
 	"github.com/lib/pq"
 
-	"github.com/netw00rk/sqltractor/driver/registry"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 type Driver struct {
-	db *sql.DB
+	db  *sql.DB
+	url string
 }
 
 const (
@@ -25,8 +25,24 @@ const (
 	LOCK_TABLE string = "schema_migrations_lock"
 )
 
-func (driver *Driver) Initialize(rawurl string) error {
-	db, err := sql.Open("postgres", rawurl)
+func New(url string) *Driver {
+	return &Driver{
+		url: url,
+	}
+}
+
+func FromConnection(db *sql.DB) *Driver {
+	return &Driver{
+		db: db,
+	}
+}
+
+func (driver *Driver) Initialize() error {
+	if driver.db != nil {
+		return nil
+	}
+
+	db, err := sql.Open("postgres", driver.url)
 	if err != nil {
 		return err
 	}
@@ -36,13 +52,14 @@ func (driver *Driver) Initialize(rawurl string) error {
 	}
 
 	driver.db = db
-	if err := driver.ensureSchemaExists(extractCurrentSchema(rawurl), extractUser(rawurl)); err != nil {
+	if err := driver.ensureSchemaExists(extractCurrentSchema(driver.url), extractUser(driver.url)); err != nil {
 		return err
 	}
 
 	if err := driver.ensureVersionTableExists(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -77,6 +94,7 @@ func (driver *Driver) Migrate(f *file.File) error {
 
 	if f.Direction == direction.Up {
 		if _, err := tx.Exec(fmt.Sprintf("INSERT INTO %s (version) VALUES ($1)", TABLE_NAME), f.Version); err != nil {
+			fmt.Println("Hello wooorlddd! " + err.Error())
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
@@ -91,16 +109,17 @@ func (driver *Driver) Migrate(f *file.File) error {
 		}
 	}
 
-	if err := f.ReadContent(); err != nil {
+	content, err := f.Content()
+	if err != nil {
 		return err
 	}
 
-	if _, err := tx.Exec(string(f.Content)); err != nil {
+	if _, err := tx.Exec(string(content)); err != nil {
 		pqErr := err.(*pq.Error)
 		offset, err := strconv.Atoi(pqErr.Position)
 		if err == nil && offset >= 0 {
-			lineNo, columnNo := file.LineColumnFromOffset(f.Content, offset-1)
-			errorPart := file.LinesBeforeAndAfter(f.Content, lineNo, 5, 5, true)
+			lineNo, columnNo := file.LineColumnFromOffset(content, offset-1)
+			errorPart := file.LinesBeforeAndAfter(content, lineNo, 5, 5, true)
 			return errors.New(fmt.Sprintf("%s %v: %s in line %v, column %v:\n\n%s", pqErr.Severity, pqErr.Code, pqErr.Message, lineNo, columnNo, string(errorPart)))
 		} else {
 			return errors.New(fmt.Sprintf("%s %v: %s", pqErr.Severity, pqErr.Code, pqErr.Message))
@@ -160,8 +179,4 @@ func extractCurrentSchema(rawurl string) string {
 func extractUser(rawurl string) string {
 	u, _ := url.Parse(rawurl)
 	return u.User.Username()
-}
-
-func init() {
-	registry.RegisterDriver("postgres", new(Driver))
 }

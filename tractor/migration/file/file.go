@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"go/token"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,21 +13,13 @@ import (
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 )
 
-var (
-	filenameRegex = regexp.MustCompile(`^([0-9]+)_(.*)\.(up|down)\..*$`)
-	DefaultReader Reader
-)
+var filenameRegex = regexp.MustCompile(`^([0-9]+)_(.*)\.(up|down)\..*$`)
 
-func SetDefaultReader(r Reader) {
-	DefaultReader = r
-}
+type ContentFunc func() ([]byte, error)
 
 // File represents one file on disk.
 // Example: 001_initial_plan_to_do_sth.up.sql
 type File struct {
-	// absolute path to file
-	Path string
-
 	// the name of the file
 	FileName string
 
@@ -38,40 +29,42 @@ type File struct {
 	// the actual migration name parsed from filename
 	Name string
 
-	// content of the file
-	Content []byte
+	// function that reads file content
+	ContentFunc ContentFunc
 
 	// UP or DOWN migration
 	Direction direction.Direction
+
+	content []byte
 }
 
-func NewFile(fileName, path string) (*File, error) {
+func NewFile(fileName string, contentFunc ContentFunc) (*File, error) {
 	version, name, d, err := parseFilenameSchema(fileName)
 	if err != nil {
 		return nil, err
 	}
 
 	return &File{
-		Path:      path,
-		FileName:  fileName,
-		Version:   version,
-		Name:      name,
-		Content:   nil,
-		Direction: d,
+		FileName:    fileName,
+		Version:     version,
+		Name:        name,
+		ContentFunc: contentFunc,
+		Direction:   d,
+		content:     nil,
 	}, nil
 
 }
 
 // ReadContent reads the file's content if the content is empty
-func (f *File) ReadContent() error {
-	if len(f.Content) == 0 {
-		content, err := DefaultReader.ReadFileContent(path.Join(f.Path, f.FileName))
+func (f *File) Content() ([]byte, error) {
+	if len(f.content) == 0 {
+		content, err := f.ContentFunc()
 		if err != nil {
-			return err
+			return nil, err
 		}
-		f.Content = content
+		f.content = content
 	}
-	return nil
+	return f.content, nil
 }
 
 // parseFilenameSchema parses the filename
@@ -143,8 +136,4 @@ func LinesBeforeAndAfter(data []byte, line, before, after int, lineNumbers bool)
 	}
 
 	return bytes.Join(newLines, []byte("\n"))
-}
-
-func init() {
-	SetDefaultReader(IOReader{})
 }

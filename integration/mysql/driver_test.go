@@ -7,12 +7,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/suite"
 
-	_ "github.com/netw00rk/sqltractor/driver/mysql"
+	"github.com/netw00rk/sqltractor/driver/mysql"
 	"github.com/netw00rk/sqltractor/integration"
-	"github.com/netw00rk/sqltractor/tractor/migration/file"
+	"github.com/netw00rk/sqltractor/reader/memory"
 )
 
-const CONNECTION_URL = "mysql://root@tcp(localhost:3308)/integration_test"
+const CONNECTION_URL = "root@tcp(localhost:3308)/integration_test"
 
 var files map[string][]byte = map[string][]byte{
 	"001_test.up.sql": []byte(`
@@ -38,14 +38,25 @@ type MysqlTestSuite struct {
 func (s *MysqlTestSuite) SetupSuite() {
 	s.DriverTestSuite.SetupSuite()
 
-	s.connection, _ = sql.Open("mysql", CONNECTION_URL)
-	s.DriverTestSuite.ConnectionUrl = CONNECTION_URL
-	file.SetDefaultReader(file.NewMemoryReader(files))
+	err := integration.RepeatWhileError(func() error {
+		var err error
+		if s.connection, err = sql.Open("mysql", CONNECTION_URL); err != nil {
+			return err
+		}
+		return s.connection.Ping()
+	})
+
+	if err != nil {
+		s.Fail(err.Error())
+	}
 }
 
 func (s *MysqlTestSuite) SetupTest() {
 	s.connection.Exec("DROP SCHEMA public CASCADE")
 	s.connection.Exec("CREATE SCHEMA public")
+
+	s.DriverTestSuite.Driver = mysql.New("mysql://" + CONNECTION_URL)
+	s.DriverTestSuite.Reader = memory.NewMemoryReader(files)
 }
 
 func (s *MysqlTestSuite) TearDownSuite() {

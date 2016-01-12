@@ -1,19 +1,22 @@
 package integration
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"time"
 
 	"github.com/stretchr/testify/suite"
 
-	_ "github.com/netw00rk/sqltractor/driver/postgres"
+	"github.com/netw00rk/sqltractor/driver"
+	"github.com/netw00rk/sqltractor/reader"
 	"github.com/netw00rk/sqltractor/tractor"
 )
 
 type DriverTestSuite struct {
 	suite.Suite
-	ConnectionUrl string
+	Driver driver.Driver
+	Reader reader.Reader
 }
 
 func (s *DriverTestSuite) SetupSuite() {
@@ -22,8 +25,6 @@ func (s *DriverTestSuite) SetupSuite() {
 		s.Fail(err.Error())
 	}
 
-	// waiting for database to start
-	time.Sleep(5 * time.Second)
 	fmt.Println("Vagrant container started")
 }
 
@@ -35,7 +36,11 @@ func (s *DriverTestSuite) TearDownSuite() {
 }
 
 func (s *DriverTestSuite) TestUpAsyncDownAsync() {
-	tractor, _ := tractor.NewTractor(s.ConnectionUrl, "/some/path/to/files")
+	tractor := &tractor.SqlTractor{
+		Driver: s.Driver,
+		Reader: s.Reader,
+	}
+
 	version, _ := tractor.Version()
 	s.Equal(uint64(0), version)
 
@@ -55,25 +60,30 @@ func (s *DriverTestSuite) TestUpAsyncDownAsync() {
 }
 
 func (s *DriverTestSuite) TestUpDown() {
-	files, err := tractor.Up(s.ConnectionUrl, "/some/path/to/files")
+	t := &tractor.SqlTractor{
+		Driver: s.Driver,
+		Reader: s.Reader,
+	}
+
+	files, err := tractor.Up(t)
 	s.Equal(2, len(files))
 	s.Nil(err)
 
-	version, _ := tractor.Version(s.ConnectionUrl, "/some/path/to/files")
+	version, _ := t.Version()
 	s.Equal(uint64(2), version)
 
-	files, err = tractor.Down(s.ConnectionUrl, "/some/path/to/files")
+	files, err = tractor.Down(t)
 	s.Equal(2, len(files))
 	s.Nil(err)
 
-	version, _ = tractor.Version(s.ConnectionUrl, "/some/path/to/files")
+	version, _ = t.Version()
 	s.Equal(uint64(0), version)
 }
 
 func (s *DriverTestSuite) TestMigrateAsyncUpDown() {
-	tractor, err := tractor.NewTractor(s.ConnectionUrl, "/some/path/to/files")
-	if err != nil {
-		s.Fail(err.Error())
+	tractor := &tractor.SqlTractor{
+		Driver: s.Driver,
+		Reader: s.Reader,
 	}
 
 	version, _ := tractor.Version()
@@ -95,17 +105,40 @@ func (s *DriverTestSuite) TestMigrateAsyncUpDown() {
 }
 
 func (s *DriverTestSuite) TestMigrateUpDown() {
-	files, err := tractor.Migrate(s.ConnectionUrl, "/some/path/to/files", +1)
+	t := &tractor.SqlTractor{
+		Driver: s.Driver,
+		Reader: s.Reader,
+	}
+
+	files, err := tractor.Migrate(t, +1)
 	s.Equal(1, len(files))
 	s.Nil(err)
 
-	version, _ := tractor.Version(s.ConnectionUrl, "/some/path/to/files")
+	version, _ := t.Version()
 	s.Equal(uint64(1), version)
 
-	files, err = tractor.Migrate(s.ConnectionUrl, "/some/path/to/files", -1)
+	files, err = tractor.Migrate(t, -1)
 	s.Equal(1, len(files))
 	s.Nil(err)
 
-	version, _ = tractor.Version(s.ConnectionUrl, "/some/path/to/files")
+	version, _ = t.Version()
 	s.Equal(uint64(0), version)
+}
+
+func RepeatWhileError(fn func() error) error {
+	startTime := time.Now()
+	ticker := time.NewTicker(1 * time.Second)
+	var err error
+	for c := range ticker.C {
+		if startTime.Add(60 * time.Second).Before(c) {
+			return errors.New(fmt.Sprintf("Can't complite function without error %s after 60 seconds", err))
+		}
+
+		if err = fn(); err == nil {
+			ticker.Stop()
+			break
+		}
+	}
+
+	return nil
 }

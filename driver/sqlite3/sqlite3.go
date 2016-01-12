@@ -9,13 +9,13 @@ import (
 
 	"github.com/mattn/go-sqlite3"
 
-	"github.com/netw00rk/sqltractor/driver/registry"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 	"github.com/netw00rk/sqltractor/tractor/migration/file"
 )
 
 type Driver struct {
-	db *sql.DB
+	db  *sql.DB
+	url string
 }
 
 const (
@@ -23,8 +23,24 @@ const (
 	LOCK_TABLE_NAME = "schema_migration_lock"
 )
 
-func (driver *Driver) Initialize(url string) error {
-	filename := strings.SplitN(url, "sqlite3://", 2)
+func New(url string) *Driver {
+	return &Driver{
+		url: url,
+	}
+}
+
+func FromConnection(db *sql.DB) *Driver {
+	return &Driver{
+		db: db,
+	}
+}
+
+func (driver *Driver) Initialize() error {
+	if driver.db != nil {
+		return nil
+	}
+
+	filename := strings.SplitN(driver.url, "sqlite3://", 2)
 	if len(filename) != 2 {
 		return errors.New("invalid sqlite3:// scheme")
 	}
@@ -89,11 +105,12 @@ func (driver *Driver) Migrate(f *file.File) error {
 		}
 	}
 
-	if err := f.ReadContent(); err != nil {
+	content, err := f.Content()
+	if err != nil {
 		return err
 	}
 
-	if _, err := tx.Exec(string(f.Content)); err != nil {
+	if _, err := tx.Exec(string(content)); err != nil {
 		if sqliteErr, isErr := err.(sqlite3.Error); isErr {
 			// The sqlite3 library only provides error codes, not position information. Output what we do know
 			return errors.New(fmt.Sprintf("SQLite Error (%s); Extended (%s)\nError: %s", sqliteErr.Code.Error(), sqliteErr.ExtendedCode.Error(), sqliteErr.Error()))
@@ -131,8 +148,4 @@ func (driver *Driver) ensureVersionTableExists() error {
 		return err
 	}
 	return nil
-}
-
-func init() {
-	registry.RegisterDriver("sqlite3", new(Driver))
 }

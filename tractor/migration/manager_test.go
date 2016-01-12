@@ -2,15 +2,25 @@ package migration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/netw00rk/sqltractor/reader/memory"
 	"github.com/netw00rk/sqltractor/tractor/migration/direction"
 )
+
+var files map[string][]byte = map[string][]byte{
+	"001_migrationfile.up.sql":   nil,
+	"001_migrationfile.down.sql": nil,
+	"002_migrationfile.up.sql":   nil,
+	"002_migrationfile.down.sql": nil,
+	"101_create_table.up.sql":    nil,
+	"101_drop_tables.down.sql":   nil,
+	"301_migrationfile.up.sql":   nil,
+	"401_migrationfile.down.sql": []byte("test"),
+}
 
 type ManagerTestSuite struct {
 	suite.Suite
@@ -19,18 +29,8 @@ type ManagerTestSuite struct {
 }
 
 func (s *ManagerTestSuite) SetupSuite() {
-	s.path, _ = ioutil.TempDir("/tmp", "TestLookForMigrationFilesInSearchPath")
-	ioutil.WriteFile(path.Join(s.path, "001_migrationfile.up.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "001_migrationfile.down.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "002_migrationfile.up.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "002_migrationfile.down.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "101_create_table.up.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "101_drop_tables.down.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "301_migrationfile.up.sql"), nil, 0755)
-	ioutil.WriteFile(path.Join(s.path, "401_migrationfile.down.sql"), []byte("test"), 0755)
-
 	var err error
-	s.manager, err = NewManager(s.path)
+	s.manager, err = NewManager(memory.NewMemoryReader(files))
 	s.Nil(err, "can not read migration files")
 }
 
