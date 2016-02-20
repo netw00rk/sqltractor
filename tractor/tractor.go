@@ -113,7 +113,6 @@ func (t *SqlTractor) applyAsync(files []*file.File) chan Result {
 func (t *SqlTractor) apply(files []*file.File, resultChan chan Result) {
 	if err := t.lock(); err != nil {
 		resultChan <- Result{nil, err}
-		t.release()
 		close(resultChan)
 		return
 	}

@@ -82,7 +82,7 @@ func (driver *Driver) Lock() error {
 }
 
 func (driver *Driver) Release() error {
-	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE_NAME)); err != nil {
+	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s CASCADE", LOCK_TABLE_NAME)); err != nil {
 		return err
 	}
 

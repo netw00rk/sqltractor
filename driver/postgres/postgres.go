@@ -79,7 +79,7 @@ func (driver *Driver) Lock() error {
 }
 
 func (driver *Driver) Release() error {
-	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s", LOCK_TABLE)); err != nil {
+	if _, err := driver.db.Exec(fmt.Sprintf("DROP TABLE %s CASCADE", LOCK_TABLE)); err != nil {
 		return err
 	}
 
@@ -94,7 +94,6 @@ func (driver *Driver) Migrate(f *file.File) error {
 
 	if f.Direction == direction.Up {
 		if _, err := tx.Exec(fmt.Sprintf("INSERT INTO %s (version) VALUES ($1)", TABLE_NAME), f.Version); err != nil {
-			fmt.Println("Hello wooorlddd! " + err.Error())
 			if err := tx.Rollback(); err != nil {
 				return err
 			}
