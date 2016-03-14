@@ -52,11 +52,12 @@ func (driver *Driver) Initialize() error {
 	}
 
 	driver.db = db
-	if err := driver.ensureSchemaExists(extractCurrentSchema(driver.url), extractUser(driver.url)); err != nil {
+	schema := extractCurrentSchema(driver.url)
+	if err := driver.ensureSchemaExists(schema, extractUser(driver.url)); err != nil {
 		return err
 	}
 
-	if err := driver.ensureVersionTableExists(); err != nil {
+	if err := driver.ensureVersionTableExists(schema); err != nil {
 		return err
 	}
 
@@ -158,11 +159,20 @@ func (driver *Driver) ensureSchemaExists(schema, user string) error {
 	return nil
 }
 
-func (driver *Driver) ensureVersionTableExists() error {
-	if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (version INTEGER NOT NULL PRIMARY KEY)", TABLE_NAME)); err != nil {
-		return err
+func (driver *Driver) ensureVersionTableExists(schema string) error {
+	if schema == "" {
+		schema = "public"
 	}
-	return nil
+
+	var count int
+	err := driver.db.QueryRow("SELECT COUNT(*) as count FROM pg_tables WHERE schemaname = $1 and tablename = $2", schema, TABLE_NAME).Scan(&count)
+	if count == 0 {
+		if _, err := driver.db.Exec(fmt.Sprintf("CREATE TABLE %s (version INTEGER NOT NULL PRIMARY KEY)", TABLE_NAME)); err != nil {
+			return err
+		}
+	}
+
+	return err
 }
 
 func extractCurrentSchema(rawurl string) string {
