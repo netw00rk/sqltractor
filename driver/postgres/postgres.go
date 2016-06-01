@@ -109,17 +109,25 @@ func (driver *Driver) Migrate(f *file.File) error {
 		}
 	}
 
-	content, err := f.Content()
+	byteContent, err := f.Content()
 	if err != nil {
 		return err
 	}
+	content := string(byteContent)
 
-	if _, err := tx.Exec(string(content)); err != nil {
+	err = nil
+	if strings.Contains(content, "tag:no_transaction") {
+		_, err = driver.db.Exec(content)
+	} else {
+		_, err = tx.Exec(content)
+	}
+
+	if err != nil {
 		pqErr := err.(*pq.Error)
 		offset, err := strconv.Atoi(pqErr.Position)
 		if err == nil && offset >= 0 {
-			lineNo, columnNo := file.LineColumnFromOffset(content, offset-1)
-			errorPart := file.LinesBeforeAndAfter(content, lineNo, 5, 5, true)
+			lineNo, columnNo := file.LineColumnFromOffset(byteContent, offset-1)
+			errorPart := file.LinesBeforeAndAfter(byteContent, lineNo, 5, 5, true)
 			return errors.New(fmt.Sprintf("%s %v: %s in line %v, column %v:\n\n%s", pqErr.Severity, pqErr.Code, pqErr.Message, lineNo, columnNo, string(errorPart)))
 		} else {
 			return errors.New(fmt.Sprintf("%s %v: %s", pqErr.Severity, pqErr.Code, pqErr.Message))

@@ -27,7 +27,9 @@ DROP TABLE test_table_2;`),
 INSERT INTO test_table_1 (id) VALUES (1);
 INSERT INTO test_table_2 (id) VALUES (1);`),
 
-	"002_test.down.sql": []byte(``),
+	"002_test.down.sql": []byte(""),
+	"003_test.up.sql":   []byte(""),
+	"003_test.down.sql": []byte(""),
 }
 
 type MysqlTestSuite struct {

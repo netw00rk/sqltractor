@@ -49,7 +49,7 @@ func (s *DriverTestSuite) TestUpAsyncDownAsync() {
 	}
 
 	version, _ = tractor.Version()
-	s.Equal(uint64(2), version)
+	s.Equal(uint64(3), version)
 
 	for r := range tractor.DownAsync() {
 		s.Nil(r.Error)
@@ -66,14 +66,14 @@ func (s *DriverTestSuite) TestUpDown() {
 	}
 
 	files, err := tractor.Up(t)
-	s.Equal(2, len(files))
+	s.Equal(3, len(files))
 	s.Nil(err)
 
 	version, _ := t.Version()
-	s.Equal(uint64(2), version)
+	s.Equal(uint64(3), version)
 
 	files, err = tractor.Down(t)
-	s.Equal(2, len(files))
+	s.Equal(3, len(files))
 	s.Nil(err)
 
 	version, _ = t.Version()

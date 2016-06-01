@@ -14,12 +14,15 @@ import (
 
 const CONNECTION_URL = "postgres://postgres@localhost:6032/integration_test?sslmode=disable"
 
+var maxVersion = 3
 var files map[string][]byte = map[string][]byte{
 	"001_test.up.sql": []byte(`
+CREATE TYPE TEST_TYPE AS ENUM('value');
 CREATE TABLE test_table_1 (id INTEGER NOT NULL PRIMARY KEY);
 CREATE TABLE test_table_2 (id INTEGER NOT NULL PRIMARY KEY);`),
 
 	"001_test.down.sql": []byte(`
+DROP TYPE TEST_TYPE;
 DROP TABLE test_table_1;
 DROP TABLE test_table_2;`),
 
@@ -28,6 +31,12 @@ INSERT INTO test_table_1 (id) VALUES (1);
 INSERT INTO test_table_2 (id) VALUES (1);`),
 
 	"002_test.down.sql": []byte(``),
+
+	"003_test.up.sql": []byte(`
+-- tag:no_transaction
+ALTER TYPE TEST_TYPE ADD VALUE 'new_value';`),
+
+	"003_test.down.sql": []byte(``),
 }
 
 type PostgresTestSuite struct {

@@ -27,7 +27,9 @@ CREATE INDEX ON test_table_1 (msg);`),
 INSERT INTO test_table_1 (id, msg) VALUES (1, 'some_text');
 INSERT INTO test_table_1 (id, msg) VALUES (2, 'some_more_text');`),
 
-	"002_test.down.sql": []byte(``),
+	"002_test.down.sql": []byte(""),
+	"003_test.up.sql":   []byte(""),
+	"003_test.down.sql": []byte(""),
 }
 
 type CassandraTestSuite struct {
